@@ -68,7 +68,7 @@ FunctionAST *t;
 %type<e> expr
 %type<svec> fpar_list
 %type<s> fpar_def
-%type<stmt> local_def
+%type<f> local_def
 // %type<a> var_def
 // %type<t> var_type
 %type<stmt> func_call

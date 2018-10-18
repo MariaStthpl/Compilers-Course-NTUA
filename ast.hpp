@@ -117,14 +117,6 @@ class LogicalOp_ExprAST: public ExprAST {
 
 typedef std::vector<StmtAST*> StatementList;
 
-class SeqExprAST: public StmtAST {
-  FunctionAST *FIRST;
-  StmtAST *SECOND;
-  public:
-    SeqExprAST(FunctionAST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
-    virtual Value *codegen() override;
-};
-
 class Block: public StmtAST {
   public:
     StatementList statements;
@@ -188,16 +180,32 @@ class PrototypeAST {
     // Stype getType() { return type; }
 };
 
-/// FunctionAST - This class represents a function definition itself.
-class FunctionAST: public StmtAST {
-  PrototypeAST *Proto;
-  Block *Body;
+class LocalDef_AST {
   public:
-    FunctionAST(PrototypeAST *Proto, Block *Body)
+  virtual ~LocalDef_AST() {}
+  virtual Function *codegen() = 0;
+};
+
+/// FunctionAST - This class represents a function definition itself.
+class FunctionAST: public LocalDef_AST {
+  PrototypeAST *Proto;
+  SeqExprAST *Body;
+  public:
+    FunctionAST(PrototypeAST *Proto, SeqExprAST *Body)
       : Proto(std::move(Proto)), Body(Body) {}
-    Function *codegenfunc();
+    virtual Function *codegen() override;
+};
+
+class SeqExprAST: public StmtAST {
+  FunctionAST *FIRST;
+  StmtAST *SECOND;
+  public:
+    SeqExprAST(FunctionAST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
     virtual Value *codegen() override;
 };
+
+
+
 
 void llvm_compile_and_dump (FunctionAST *t);
 
