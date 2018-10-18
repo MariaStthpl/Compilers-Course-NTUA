@@ -9,7 +9,7 @@ extern int yylex();
 void yyerror (const char *msg);
 
 extern int linenumber;
-StmtAST *t;
+FunctionAST *t;
 %}
 
 %expect 1 // 1 - if else, 8 - stmt_list
@@ -59,63 +59,63 @@ StmtAST *t;
 %left UPLUS UMINUS
 %nonassoc IF_PART NO_ELSE
 
-%type<stmt> program
-// %type<f> func_def
-// %type<e> func_body
+%type<f> program
+%type<f> func_def
+%type<block> func_body
 %type<block> compound_stmt
 %type<block> stmt_list
 %type<stmt> stmt
 %type<e> expr
-// %type<svec> fpar_list
-// %type<s> fpar_def
-// %type<e> local_def
+%type<svec> fpar_list
+%type<s> fpar_def
+%type<stmt> local_def
 // %type<a> var_def
 // %type<t> var_type
-// %type<e> func_call
-// %type<vec> expr_list
+%type<stmt> func_call
+%type<vec> expr_list
 // %type<variable> l_value
 // %type<a> l_value
 
 // %type<a> ret_value
 %type<e> cond
-// %type<t> data_type
+%type<t> data_type
 // %type<t> type
-// %type<t> r_type
+%type<t> r_type
 
 %%
-// program:
-//   func_def                            { t = $$ = $1; }
-// ;
-
 program:
-  stmt_list                           { t = $$ = $1; }
+  func_def                            { t = $$ = $1; }
 ;
 
-// func_def:
-//   T_NAME '(' fpar_list ')'':' r_type func_body    { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
-//   //new FunctionAST(new PrototypeAST($1, $3), new ConstExprAST(1)); }//{ $$ = ast_fun_def($1, $3, $6, $7, $8); }
+// program:
+//   stmt_list                           { t = $$ = $1; }
 // ;
 
-// func_body:
-//   local_def compound_stmt             { $$ = new SeqExprAST($1, $2); }
-// ;
+func_def:
+  T_NAME '(' fpar_list ')'':' r_type func_body    { $$ = new FunctionAST(new PrototypeAST(*$1, *$3), $7); } 
+;
 
-// fpar_def:
+func_body:
+  local_def compound_stmt             { $$ = new SeqExprAST($1, $2); } //{ $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); if ($<stmt>2 != NULL) $$->Block::statements.push_back($<stmt>2); }//{ $$ = new SeqExprAST($1, $2); }
+;
+
+fpar_def:
 //   T_NAME ':' type                     { $$ = $1; }
 // | T_NAME ':' TREFERENCE type          { $$ = $1; }
-// ;
+  T_NAME                              { $$ = $1; }
+;
 
-// fpar_list:
-//   /* nothing */                       { $$ = nullptr; }
-// | fpar_def                            { $$ = nullptr; }
-// | fpar_list ',' fpar_def              { $$ = nullptr; }
-// ;
+fpar_list:
+  /* nothing */                       { $$ = new std::vector<std::string>(); }
+| fpar_def                            { $$ = new std::vector<std::string>(); $$->push_back(*$1); }
+| fpar_list ',' fpar_def              { $$ = nullptr; }
+;
 
-// local_def:
-//   /* nothing */                       { $$ = nullptr; }
-// | func_def                            {  } 
+local_def:
+  /* nothing */                       { $$ = NULL; }
+| func_def                            { $$ = $1; } 
 // | var_def ';' local_def               {  }
-// ;
+;
 
 // var_def:
 //   T_NAME ':' var_type                 {  }
@@ -126,15 +126,15 @@ program:
 // | data_type '[' T_const ']'           {  } 
 // ;
 
-// data_type:
-//   TINT                                { $$ = typeInteger; }
-// | TBYTE                               { $$ = typeInteger; }
-// ;
+data_type:
+  TINT                                { $$ = typeInteger; }
+| TBYTE                               { $$ = typeInteger; }
+;
 
-// r_type:
-//   data_type                           { $$ = $1; }
-// | TPROC                               { $$ = typeVoid; }
-// ;
+r_type:
+  data_type                           { $$ = $1; }
+| TPROC                               { $$ = typeVoid; }
+;
 
 compound_stmt:
   '{' stmt_list '}'                   { $$ = $2; }
@@ -149,7 +149,7 @@ stmt:
   ';'                                 { $$ = NULL; }
 // | l_value '=' expr ';'                { $$ = ast_let($1, $3); }         // Anathesi
 | compound_stmt                       { $$ = $1; }
-// | func_call ';'                       { $$ = $1; }
+| func_call ';'                       { $$ = $1; }
 | TIF '(' cond ')' stmt               { $$ = new If_ExprAST($3, $5, NULL);  }
 | TIF '(' cond ')' stmt TELSE stmt    { $$ = new If_ExprAST($3, $5, $7);  }
 | TWHILE '(' cond ')' stmt            { $$ = new While_ExprAST($3, $5); }       // while loop
@@ -168,15 +168,15 @@ stmt:
 // | expr                                {  }
 // ;
 
-// func_call:
-//   T_NAME '(' expr_list ')'            { $$ = new CallExprAST(*$1, *$3); delete $3; }
-// ;
+func_call:
+  T_NAME '(' expr_list ')'            { $$ = new CallExprAST(*$1, *$3); }
+;
 
-// expr_list :
-//   /* nothing */                       { $$ = new ExpressionList(); }
-// | expr                                { $$ = new ExpressionList(); $$->push_back($1); }
-// | expr_list ',' expr                  { $1->push_back($3); }
-// ;
+expr_list :
+  /* nothing */                       { $$ = new ExpressionList(); }
+| expr                                { $$ = new ExpressionList(); $$->push_back($1); }
+| expr_list ',' expr                  { $1->push_back($3); }
+;
 
 expr:
   T_const                             { $$ = new ConstExprAST($1); }

@@ -71,14 +71,6 @@ class Var_ExprAST: public ExprAST {
     Value *codegen() override;
 };
 
-class SeqExprAST: public ExprAST {
-  ExprAST *FIRST;
-  StmtAST *SECOND;
-  public:
-    SeqExprAST(ExprAST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
-    virtual Value *codegen() override;
-};
-
 class IdExprAST : public ExprAST {
   std::string Name;
   public:
@@ -121,43 +113,17 @@ class LogicalOp_ExprAST: public ExprAST {
     virtual Value *codegen() override;
 };
 
-class CallExprAST : public ExprAST {
-  std::string Callee;
-  std::vector<ExprAST*> Args;
-  public:
-    CallExprAST(const std::string &Callee,
-                std::vector<ExprAST*> Args)
-      : Callee(Callee), Args(std::move(Args)) {}
-    virtual Value *codegen() override;
-};
-
-// PrototypeAST - This class represents the "prototype" for a function, which captures its name,
-// and its argument names (thus implicitly the number of arguments the function takes).
-class PrototypeAST {
-  Stype type = typeVoid;
-  std::string Name;
-  std::vector<std::string> Args;
-  public:
-    PrototypeAST(const std::string &name, std::vector<std::string> Args)
-      : type(type), Name(name), Args(std::move(Args)) {}
-    Function *codegen();
-    const std::string &getName() const { return Name; }
-    Stype getType() { return type; }
-};
-
-/// FunctionAST - This class represents a function definition itself.
-class FunctionAST {
-  PrototypeAST *Proto;
-  ExprAST *Body;
-  public:
-    FunctionAST(PrototypeAST *Proto, ExprAST *Body)
-      : Proto(std::move(Proto)), Body(std::move(Body)) {}
-    Function *codegen();
-};
-
 /* ------------------------------------------- StmtAST ------------------------------------------- */
 
 typedef std::vector<StmtAST*> StatementList;
+
+class SeqExprAST: public StmtAST {
+  FunctionAST *FIRST;
+  StmtAST *SECOND;
+  public:
+    SeqExprAST(FunctionAST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
+    virtual Value *codegen() override;
+};
 
 class Block: public StmtAST {
   public:
@@ -198,6 +164,41 @@ class PRINTAST: public StmtAST {
     virtual Value *codegen() override;
 };
 
-void llvm_compile_and_dump (StmtAST *t);
+class CallExprAST : public StmtAST {
+  std::string Callee;
+  std::vector<ExprAST*> Args;
+  public:
+    CallExprAST(const std::string &Callee,
+                std::vector<ExprAST*> Args)
+      : Callee(Callee), Args(std::move(Args)) {}
+    virtual Value *codegen() override;
+};
+
+// PrototypeAST - This class represents the "prototype" for a function, which captures its name,
+// and its argument names (thus implicitly the number of arguments the function takes).
+class PrototypeAST {
+  // Stype type = typeVoid;
+  std::string Name;
+  std::vector<std::string> Args;
+  public:
+    PrototypeAST(const std::string &name, std::vector<std::string> Args)
+      : Name(name), Args(std::move(Args)) {}
+    Function *codegen();
+    const std::string &getName() const { return Name; }
+    // Stype getType() { return type; }
+};
+
+/// FunctionAST - This class represents a function definition itself.
+class FunctionAST: public StmtAST {
+  PrototypeAST *Proto;
+  Block *Body;
+  public:
+    FunctionAST(PrototypeAST *Proto, Block *Body)
+      : Proto(std::move(Proto)), Body(Body) {}
+    Function *codegenfunc();
+    virtual Value *codegen() override;
+};
+
+void llvm_compile_and_dump (FunctionAST *t);
 
 #endif

@@ -39,7 +39,7 @@ inline ConstantInt *c32(int n)
   return ConstantInt::get(TheContext, APInt(32, n, true));
 }
 
-void llvm_compile_and_dump(StmtAST *t) {
+void llvm_compile_and_dump(FunctionAST *t) {
   // Initialize the module and the optimization passes.
   TheModule = make_unique<Module>("minibasic program", TheContext);
   TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
@@ -94,7 +94,7 @@ void llvm_compile_and_dump(StmtAST *t) {
   t->codegen();
 
   Builder.GetInsertBlock();
-  // Builder.SetInsertPoint(BB);
+  Builder.SetInsertPoint(BB);
   Builder.CreateRet(c32(0));
   // Verify and optimize the main function.
   bool bad = verifyModule(*TheModule, &errs());
@@ -135,10 +135,6 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
                    TheFunction->getEntryBlock().begin());
   return TmpB.CreateAlloca(Type::getDoubleTy(getGlobalContext()), 0,
                            VarName.c_str());
-}
-
-Value *Var_ExprAST::codegen() {
-  
 }
 
 
@@ -249,10 +245,10 @@ Value *CallExprAST::codegen() {
 Function *PrototypeAST::codegen() {
   printf("PROTO START!\n");
   // Make the function type:  double(double,double) etc.
-  std::vector<Type*> Doubles(Args.size(),
-                             Type::getDoubleTy(TheContext));
+  std::vector<Type*> Ints(Args.size(),
+                             Type::getInt32Ty(TheContext));
   FunctionType *FT =
-    FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
+    FunctionType::get(Type::getInt32Ty(TheContext), Ints, false);
 
   Function *F =
     Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
@@ -265,7 +261,7 @@ Function *PrototypeAST::codegen() {
   return F;
 }
 
-Function *FunctionAST::codegen() {
+Function *FunctionAST::codegenfunc() {
   printf("FUNC START!\n");
     // First, check for an existing function from a previous 'extern' declaration.
   Function *TheFunction = TheModule->getFunction(Proto->getName());
@@ -288,22 +284,26 @@ Function *FunctionAST::codegen() {
   for (auto &Arg : TheFunction->args())
     NamedValues[Arg.getName()] = &Arg;
 
-  Body->codegen();
-  if ( Proto->getType() == typeVoid )
-    Builder.CreateRetVoid();
-  if ( Proto->getType() == typeInteger )
-    Builder.CreateRet(c32(0));
+  // Body->codegen();
+  // Builder.CreateRet(c32(0));
+  // verifyFunction(*TheFunction);
+  // return TheFunction;
+  // if ( Proto->getType() == typeVoid )
+  //   Builder.CreateRetVoid();
+  // if ( Proto->getType() == typeInteger )
+  //   Builder.CreateRet(c32(0));
   
-  // if (Value *RetVal = Body->codegen()) {
-  //   printf("ENTERED!\n");
-  //   // Finish off the function.
+  if (Value *RetVal = Body->codegen()) {
+    printf("ENTERED!\n");
+    // Finish off the function.
     // Builder.CreateRet(RetVal);
+    Builder.CreateRet(c32(0));
 
-  //   // Validate the generated code, checking for consistency.
-  //   verifyFunction(*TheFunction);
+    // Validate the generated code, checking for consistency.
+    verifyFunction(*TheFunction);
 
-  //   return TheFunction;
-  // }
+    return TheFunction;
+  }
   
   // Error reading body, remove function.
   // TheFunction->eraseFromParent();
@@ -315,7 +315,7 @@ Function *FunctionAST::codegen() {
 Value *SeqExprAST::codegen() {
   Value *last = nullptr;
   if (FIRST)
-    FIRST->codegen();
+    last = FIRST->codegen();
   if(SECOND) {
     last = SECOND->codegen();
     return last;
@@ -366,7 +366,7 @@ Value *If_ExprAST::codegen() {
 
   TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder.SetInsertPoint(MergeBB);
-  return nullptr;
+  return c32(0);
 }
 
 Value *While_ExprAST::codegen() {
@@ -399,7 +399,7 @@ Value *While_ExprAST::codegen() {
   TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder.SetInsertPoint(MergeBB);
   
-  return nullptr;
+  return c32(0);
 }
 
 
@@ -411,6 +411,7 @@ Value *PRINTAST::codegen() {
   Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
   Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return c32(0);
+  // return (ConstantFP::get(TheContext, APFloat(0.0));
 }
 
 /* ------------------- StmtAST --------------------- */
