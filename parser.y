@@ -18,6 +18,9 @@ FunctionAST *t;
   std::vector<ExprAST*> *vec;
   FunctionAST *f;
 
+  SeqExprAST *seq;
+  LocalDef_AST *ld;
+
   Block *block;
   StmtAST *stmt;
   // std::vector<StmtAST*> stmtvec;
@@ -61,14 +64,14 @@ FunctionAST *t;
 
 %type<f> program
 %type<f> func_def
-%type<block> func_body
+%type<seq> func_body
 %type<block> compound_stmt
 %type<block> stmt_list
 %type<stmt> stmt
 %type<e> expr
 %type<svec> fpar_list
 %type<s> fpar_def
-%type<f> local_def
+%type<ld> local_def
 // %type<a> var_def
 // %type<t> var_type
 %type<stmt> func_call

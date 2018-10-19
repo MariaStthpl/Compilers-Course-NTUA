@@ -180,28 +180,30 @@ class PrototypeAST {
     // Stype getType() { return type; }
 };
 
-class LocalDef_AST {
+class LocalDef_AST { 
   public:
   virtual ~LocalDef_AST() {}
   virtual Function *codegen() = 0;
 };
 
+class SeqExprAST: public StmtAST {
+  LocalDef_AST *FIRST;
+  StmtAST *SECOND;
+  public:
+    SeqExprAST(LocalDef_AST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
+    virtual Value *codegen() override;
+};
+
 /// FunctionAST - This class represents a function definition itself.
 class FunctionAST: public LocalDef_AST {
-  PrototypeAST *Proto;
-  SeqExprAST *Body;
+  // PrototypeAST *Proto;
+  // SeqExprAST *Body;
   public:
+    PrototypeAST *Proto;
+    SeqExprAST *Body;
     FunctionAST(PrototypeAST *Proto, SeqExprAST *Body)
       : Proto(std::move(Proto)), Body(Body) {}
     virtual Function *codegen() override;
-};
-
-class SeqExprAST: public StmtAST {
-  FunctionAST *FIRST;
-  StmtAST *SECOND;
-  public:
-    SeqExprAST(FunctionAST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
-    virtual Value *codegen() override;
 };
 
 

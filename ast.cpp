@@ -79,22 +79,16 @@ void llvm_compile_and_dump(FunctionAST *t) {
       Function::Create(writeString_type, Function::ExternalLinkage,
                        "writeString", TheModule.get());
   // Define and start the main function.
-  // Function *main = TheModule->getFnction(Proto->getName());
-  // BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  // Builder.SetInsertPoint(BB);
-
   Constant *c = TheModule->getOrInsertFunction("main", i32, NULL);
   Function *main = cast<Function>(c);
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", main);
   Builder.SetInsertPoint(BB);
+  
   // Emit the program code.
-
-  // ..................
-  // ast_compile(t);
-  t->codegen();
+  t->Body->codegen();
+  // t->codegen();
 
   Builder.GetInsertBlock();
-  Builder.SetInsertPoint(BB);
   Builder.CreateRet(c32(0));
   // Verify and optimize the main function.
   bool bad = verifyModule(*TheModule, &errs());
@@ -243,7 +237,6 @@ Value *CallExprAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-  printf("PROTO START!\n");
   // Make the function type:  double(double,double) etc.
   std::vector<Type*> Ints(Args.size(),
                              Type::getInt32Ty(TheContext));
@@ -257,14 +250,13 @@ Function *PrototypeAST::codegen() {
   unsigned Idx = 0;
   for (auto &Arg : F->args())
     Arg.setName(Args[Idx++]);
-  printf("PROTO END!\n");
   return F;
 }
 
-Function *FunctionAST::codegenfunc() {
-  printf("FUNC START!\n");
+Function *FunctionAST::codegen() {
     // First, check for an existing function from a previous 'extern' declaration.
   Function *TheFunction = TheModule->getFunction(Proto->getName());
+  // std::cout << "FunName: " << Proto->getName() << std::endl;
 
   if (!TheFunction)
     TheFunction = Proto->codegen();
@@ -284,31 +276,25 @@ Function *FunctionAST::codegenfunc() {
   for (auto &Arg : TheFunction->args())
     NamedValues[Arg.getName()] = &Arg;
 
-  // Body->codegen();
-  // Builder.CreateRet(c32(0));
-  // verifyFunction(*TheFunction);
-  // return TheFunction;
   // if ( Proto->getType() == typeVoid )
   //   Builder.CreateRetVoid();
   // if ( Proto->getType() == typeInteger )
   //   Builder.CreateRet(c32(0));
   
   if (Value *RetVal = Body->codegen()) {
-    printf("ENTERED!\n");
+    Builder.GetInsertBlock();
+
     // Finish off the function.
-    // Builder.CreateRet(RetVal);
-    Builder.CreateRet(c32(0));
+    Builder.CreateRet(RetVal);
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
-
     return TheFunction;
   }
   
   // Error reading body, remove function.
-  // TheFunction->eraseFromParent();
+  TheFunction->eraseFromParent();
 
-  printf("FUNC END!\n");
   return nullptr;
 }
 
