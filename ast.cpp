@@ -14,8 +14,8 @@ using namespace llvm;
 static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
-static std::map<std::string, Value *> NamedValues;
-// static std::map<std::string, AllocaInst *> NamedValues;
+// static std::map<std::string, Value *> NamedValues;
+static std::map<std::string, AllocaInst *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 
 // Global LLVM variables related to the generated code.
@@ -83,12 +83,15 @@ void llvm_compile_and_dump(FunctionAST *t) {
   Function *main = cast<Function>(c);
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", main);
   Builder.SetInsertPoint(BB);
-  
+
   // Emit the program code.
-  t->Body->codegen();
+  // t->Body->codegen();
   // t->codegen();
+  t->Proto->codegen();
+  t->Body->codegen();
 
   Builder.GetInsertBlock();
+  // Builder.SetInsertPoint(BB);
   Builder.CreateRet(c32(0));
   // Verify and optimize the main function.
   bool bad = verifyModule(*TheModule, &errs());
@@ -123,12 +126,11 @@ Value *LogErrorV(const char *Str) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
-                                          const std::string &VarName) {
-  IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-                   TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getDoubleTy(getGlobalContext()), 0,
-                           VarName.c_str());
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName) {
+  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), 
+                    TheFunction->getEntryBlock().begin());
+  return TmpB.CreateAlloca(Type::getInt32Ty(getGlobalContext()), 0, 
+                    VarName.c_str());
 }
 
 
@@ -138,7 +140,8 @@ Value *IdExprAST::codegen() {
   Value *V = NamedValues[Name];
   if (!V)
     LogErrorV("Unknown variable name");
-  return V;
+  // return V;
+  return Builder.CreateLoad(V, Name.c_str());
 }
 
 /* IR for CONST */
@@ -273,8 +276,15 @@ Function *FunctionAST::codegen() {
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
-  for (auto &Arg : TheFunction->args())
-    NamedValues[Arg.getName()] = &Arg;
+  for (auto &Arg : TheFunction->args()) {
+    // Create an alloca for this variable
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
+    // Store the initial value into alloca
+    Builder.CreateStore(&Arg, Alloca);
+    // Add arguments to variable symbol table
+    NamedValues[Arg.getName()] = Alloca;
+  }
+    // NamedValues[Arg.getName()] = &Arg;
 
   // if ( Proto->getType() == typeVoid )
   //   Builder.CreateRetVoid();
@@ -282,7 +292,9 @@ Function *FunctionAST::codegen() {
   //   Builder.CreateRet(c32(0));
   
   if (Value *RetVal = Body->codegen()) {
+    Builder.SetInsertPoint(BB);
     Builder.GetInsertBlock();
+    
 
     // Finish off the function.
     Builder.CreateRet(RetVal);
@@ -388,6 +400,21 @@ Value *While_ExprAST::codegen() {
   return c32(0);
 }
 
+Value *Assignment_StmtAST::codegen() {
+  // IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS.get());
+  IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS);
+  if (!LHSE)
+    return LogErrorV("destination of '=' must be a variable");
+  Value *Val = RHS->codegen();
+  if (!Val)
+    return nullptr;
+  Value *Variable = NamedValues[LHSE->getName()];
+  if (!Variable)
+    return LogErrorV("Unknown variable name");
+  Builder.CreateStore(Val, Variable);
+  return Val;
+}
+
 
 Value *PRINTAST::codegen() {
   Value *n = p->codegen();
@@ -416,4 +443,41 @@ Value *Block::codegen() {
 Value *Statement::codegen() {
   // std::cout << "Generating code for " << typeid(expr).name() << std::endl;
   return expr.codegen();
+}
+
+Value *VarDef::codegen() {
+  std::vector<AllocaInst *> OldBindings;
+
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
+  // Register all variables and emit their initializer
+  for ( unsigned i = 0, e = VarNames.size(); i != e; ++i ) {
+    const std::string &VarName = VarNames[i].first;
+    // ExprAST *Init = VarNames[i].second.get();
+    ExprAST *Init = VarNames[i].second;
+
+    Value *InitVal;
+    if (Init) {
+      InitVal = Init->codegen();
+      if (!InitVal)
+        return nullptr;
+    } else {
+      InitVal = c32(0);
+    }
+
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+    Builder.CreateStore(InitVal, Alloca);
+
+    OldBindings.push_back(NamedValues[VarName]);
+
+    NamedValues[VarName] = Alloca;
+  }
+
+  Value *BodyVal = Body->codegen();
+  if (!BodyVal)
+    return nullptr;
+  for ( unsigned i = 0, e = VarNames.size(); i != e; ++i )
+    NamedValues[VarNames[i].first] = OldBindings[i];
+
+  return BodyVal;
 }

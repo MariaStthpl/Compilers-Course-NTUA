@@ -12,7 +12,7 @@ extern int linenumber;
 FunctionAST *t;
 %}
 
-%expect 1 // 1 - if else, 8 - stmt_list
+%expect 2 // 1 - if else, 1 - var_def
 %union{
   ExprAST *e;
   std::vector<ExprAST*> *vec;
@@ -24,6 +24,12 @@ FunctionAST *t;
   Block *block;
   StmtAST *stmt;
   // std::vector<StmtAST*> stmtvec;
+
+  std::vector<std::pair<std::string, ExprAST *>> *vdef;
+  std::pair<std::string, ExprAST *> *def;
+  VarDef *fb;
+
+  IdExprAST *id;
 
   char c;
   // char *s;
@@ -64,20 +70,20 @@ FunctionAST *t;
 
 %type<f> program
 %type<f> func_def
-%type<seq> func_body
+%type<fb> func_body
 %type<block> compound_stmt
 %type<block> stmt_list
 %type<stmt> stmt
 %type<e> expr
 %type<svec> fpar_list
 %type<s> fpar_def
-%type<ld> local_def
-// %type<a> var_def
+%type<vdef> local_def
+%type<def> var_def
 // %type<t> var_type
 %type<stmt> func_call
 %type<vec> expr_list
 // %type<variable> l_value
-// %type<a> l_value
+%type<id> l_value
 
 // %type<a> ret_value
 %type<e> cond
@@ -99,7 +105,7 @@ func_def:
 ;
 
 func_body:
-  local_def compound_stmt             { $$ = new SeqExprAST($1, $2); } //{ $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); if ($<stmt>2 != NULL) $$->Block::statements.push_back($<stmt>2); }//{ $$ = new SeqExprAST($1, $2); }
+  local_def compound_stmt             { $$ = new VarDef(*$1, $2); } //{ $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); if ($<stmt>2 != NULL) $$->Block::statements.push_back($<stmt>2); }//{ $$ = new SeqExprAST($1, $2); }
 ;
 
 fpar_def:
@@ -115,14 +121,17 @@ fpar_list:
 ;
 
 local_def:
-  /* nothing */                       { $$ = NULL; }
-| func_def                            { $$ = $1; } 
-// | var_def ';' local_def               {  }
+  /* nothing */                       { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); }
+// | func_def                            { $$ = $1; } 
+| var_def                             { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back(*$1); }
+// | var_def ';' local_def               { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back }
+| local_def  var_def               { $1->push_back(*$2); }
 ;
 
-// var_def:
-//   T_NAME ':' var_type                 {  }
-// ;
+var_def:
+  // T_NAME ':' var_type                 {  }
+  T_NAME '=' expr ';'                 { $$ = new std::pair<std::string, ExprAST*>(*$1, $3);  }
+;
 
 // var_type:
 //   data_type                           {  }
@@ -160,11 +169,11 @@ stmt:
 | "print" expr ';'                    { $$ = new PRINTAST($2); }
 ;
 
-// l_value:
-//   T_NAME                              {  }
+l_value:
+  T_NAME                              { $$ = new IdExprAST(*$1); }
 // | T_NAME '[' expr ']'                 {  }
 // // | T_STRING                            { $$ = $1; }
-// ;
+;
 
 // ret_value:
 //   /* nothing */                       {  }
@@ -184,7 +193,7 @@ expr_list :
 expr:
   T_const                             { $$ = new ConstExprAST($1); }
 // | T_CHAR                              {  }
-// | l_value                             {  }
+| l_value                             { $$ = $1; }
 | '(' expr ')'                        { $$ = $2; }
 | expr '+' expr                       { $$ = new ArithmeticOp_ExprAST($1, PLUS, $3); }
 | expr '-' expr                       { $$ = new ArithmeticOp_ExprAST($1, MINUS, $3); }

@@ -76,6 +76,7 @@ class IdExprAST : public ExprAST {
   public:
     IdExprAST(const std::string &Name) : Name(Name) {}
     virtual Value *codegen() override;
+    const std::string &getName() const { return Name; }
 };
 
 class ConstExprAST : public ExprAST {
@@ -146,7 +147,13 @@ class While_ExprAST: public StmtAST {
   public:
     While_ExprAST(ExprAST *Cond, StmtAST *Stmt) : Cond(Cond), Stmt(Stmt) { }
     virtual Value *codegen() override;
+};
 
+class Assignment_StmtAST: public StmtAST {
+  ExprAST *LHS, *RHS;
+  public:
+    Assignment_StmtAST(ExprAST *LHS, ExprAST *RHS): LHS(std::move(LHS)), RHS(std::move(RHS)) { }
+    Value *codegen() override;
 };
 
 class PRINTAST: public StmtAST {
@@ -186,6 +193,14 @@ class LocalDef_AST {
   virtual Function *codegen() = 0;
 };
 
+class VarDef {
+  std::vector<std::pair<std::string, ExprAST *>> VarNames;
+  Block *Body;
+  public:
+    VarDef(std::vector<std::pair<std::string, ExprAST*>> VarNames, Block *Body) : VarNames(std::move(VarNames)), Body(std::move(Body)) { }
+    Value *codegen();
+};
+
 class SeqExprAST: public StmtAST {
   LocalDef_AST *FIRST;
   StmtAST *SECOND;
@@ -200,8 +215,8 @@ class FunctionAST: public LocalDef_AST {
   // SeqExprAST *Body;
   public:
     PrototypeAST *Proto;
-    SeqExprAST *Body;
-    FunctionAST(PrototypeAST *Proto, SeqExprAST *Body)
+    VarDef *Body;
+    FunctionAST(PrototypeAST *Proto, VarDef *Body)
       : Proto(std::move(Proto)), Body(Body) {}
     virtual Function *codegen() override;
 };
