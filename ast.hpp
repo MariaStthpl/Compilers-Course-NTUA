@@ -28,6 +28,7 @@ class CodeGenBlock {
   public:
     BasicBlock *block;
     Value *returnValue;
+    std::map<std::string, AllocaInst*> locals;
 };
 
 class CodeGenContext {
@@ -37,6 +38,7 @@ class CodeGenContext {
     int id = 0;
     Module *module;
     CodeGenContext() { }
+    std::map<std::string, AllocaInst*>& locals() { return blocks.top()->locals; }
     BasicBlock *currentBlock() { return blocks.top()->block; }
     void pushBlock(BasicBlock *block) { 
         blocks.push(new CodeGenBlock()); blocks.top()->returnValue = NULL;
@@ -204,7 +206,7 @@ class PRINTAST: public StmtAST {
     virtual Value *codegen() override;
 };
 
-class CallExprAST : public StmtAST {
+class CallExprAST : public StmtAST, public ExprAST {
   std::string Callee;
   std::vector<ExprAST*> Args;
   public:

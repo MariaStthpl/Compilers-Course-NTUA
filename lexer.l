@@ -53,11 +53,6 @@ CC ([^'\"\\]|{ES})
 "strcat"                { return T_STRCAT; }                
 
 "print"                 { return T_print; }
-"do"                    { return T_do; }
-"begin"                 { return T_begin; }
-"end"                   { return T_end; }
-"var"                   { return T_var; }
-"bool"                  { return T_bool; }
 
 [-=+*/%!&|<>]           { return yytext[0]; }
 [()}{,:;]               { return yytext[0]; }
@@ -68,11 +63,11 @@ CC ([^'\"\\]|{ES})
 "=="				    { return EQ_OP; }
 "!="				    { return NEQ_OP; }
 
-'{CC}'                  { return T_CHAR; }
+'{CC}'                  { return T_CHAR_CONST; }
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = yytext; return T_NAME; return T_STRING; } */
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; return T_STRING; } */
 
-\"([^'\"\\\n]|{ES})*\"  { yylval.s = new std::string(yytext); return T_NAME; return T_STRING; }
+\"([^'\"\\\n]|{ES})*\"  { yylval.s = new std::string(yytext); return T_STRING; }
 
     /* {L}({D}|{L}|_)*         { yylval.s = yytext; return T_NAME; } */
     /* {L}({D}|{L}|_)*         { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; } */

@@ -32,7 +32,7 @@ minibasic: lexer.o parser.o ast.o general.o error.o symbol.o
 	$(CXX) $(CXXFLAGS) -o minibasic $^ $(LDFLAGS) -lfl
 
 clean:
-	$(RM) lexer.cpp parser.cpp parser.hpp parser.output a.* *.o *~
+	$(RM) lexer.cpp parser.cpp parser.hpp parser.output a.* *.o *~ minibasic *.dot
 
 distclean: clean
 	$(RM) minibasic

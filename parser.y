@@ -14,39 +14,27 @@ FunctionAST *t;
 
 %expect 9 // 1 - if else, 1 - var_def, 6 - stmt_list, 1 - return
 %union{
-  ExprAST *e;
-  std::vector<ExprAST*> *vec;
+  IdExprAST *id;
+
+  ExprAST *expr;
+  std::vector<ExprAST*> *vexpr;
+  
   FunctionAST *f;
+  FuncBody_AST *fb;
   
   Type *t;
+  LocalDef_AST *ld;
+  VarDef *vardef;
+  std::vector<LocalDef_AST *> *vdef;
   std::pair<std::string, Type *> *fpar;
   std::vector<std::pair<std::string, Type *>> *vfpar;
 
-  LocalDef_AST *ld;
-  VarDef *vardef;
-
   Block *block;
   StmtAST *stmt;
-  // std::vector<StmtAST*> stmtvec;
 
-  // std::vector<std::pair<std::string, ExprAST *>> *vdef;
-  std::vector<LocalDef_AST *> *vdef;
-
-  std::pair<std::string, ExprAST *> *def;
-  FuncBody_AST *fb;
-
-  IdExprAST *id;
-
-  char c;
-  // char *s;
-  std::string *s;
-  std::vector<std::string> *svec;
   int n;
-  // Stype t;
-  // struct vars {
-  //   char *s;
-  //   int offset;
-  // } variable;
+  char c;
+  std::string *s;
 }
 
 %token TINT TBYTE TIF TELSE TTRUE TFALSE TPROC TREFERENCE TRETURN TWHILE
@@ -54,16 +42,10 @@ FunctionAST *t;
 %token LE_OP GE_OP EQ_OP NEQ_OP
 
 %token T_print "print"
-%token T_do "do"
-%token T_begin "begin"
-%token T_end "end"
-%token T_var "var"
-%token T_bool "bool"
 %token<s> T_id
 %token<n> T_const
-%token<s> T_NAME
 %token<n> T_INT_CONST
-%token<n> T_CHAR
+%token<n> T_CHAR_CONST
 %token<s> T_STRING
 
 %left '|'
@@ -81,19 +63,19 @@ FunctionAST *t;
 %type<block> compound_stmt
 %type<block> stmt_list
 %type<stmt> stmt
-%type<e> expr
+%type<expr> expr
 %type<vfpar> fpar_list
 %type<fpar> fpar_def
 %type<vdef> local_def
 %type<vardef> var_def
 %type<t> var_type
 %type<stmt> func_call
-%type<vec> expr_list
+%type<vexpr> expr_list
 // %type<variable> l_value
 %type<id> l_value
 
 // %type<a> ret_value
-%type<e> cond
+%type<expr> cond
 %type<t> data_type
 %type<t> type
 %type<t> r_type
@@ -136,6 +118,7 @@ local_def:
 | var_def                             { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
 // | var_def ';' local_def               { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back }
 | local_def var_def                   { $1->push_back($<ld>2); }
+| local_def func_def                   { $1->push_back($<ld>2); }
 ;
 
 var_def:
@@ -175,9 +158,9 @@ stmt:
 | func_call ';'                       { $$ = $1; }
 | TIF '(' cond ')' stmt               { $$ = new If_ExprAST($3, $5, NULL);  }
 | TIF '(' cond ')' stmt TELSE stmt    { $$ = new If_ExprAST($3, $5, $7);  }
-| TWHILE '(' cond ')' stmt            { $$ = new While_ExprAST($3, $5); }       // while loop
-| TRETURN expr ';'                    { $$ = new Return($2); }      //???????
-// | TRETURN ';'                         { $$ = new Return(NULL); }      //???????
+| TWHILE '(' cond ')' stmt            { $$ = new While_ExprAST($3, $5); }
+| TRETURN expr ';'                    { $$ = new Return($2); }
+| TRETURN ';'                         { $$ = new Return(nullptr); } 
 | "print" expr ';'                    { $$ = new PRINTAST($2); }
 ;
 
@@ -204,9 +187,10 @@ expr_list :
 
 expr:
   T_INT_CONST                         { $$ = new IntConst_ExprAST($1); }
-| T_CHAR                              { $$ = new CharConst_ExprAST($1); }
+| T_CHAR_CONST                        { $$ = new CharConst_ExprAST($1); }
 | l_value                             { $$ = $1; }
 | '(' expr ')'                        { $$ = $2; }
+| func_call ';'                       { $$ = $<expr>1; }
 | expr '+' expr                       { $$ = new ArithmeticOp_ExprAST($1, PLUS, $3); }
 | expr '-' expr                       { $$ = new ArithmeticOp_ExprAST($1, MINUS, $3); }
 | expr '*' expr                       { $$ = new ArithmeticOp_ExprAST($1, TIMES, $3); }

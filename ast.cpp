@@ -15,7 +15,7 @@ static LLVMContext TheContext;
 static IRBuilder<> Builder(TheContext);
 static std::unique_ptr<Module> TheModule;
 // static std::map<std::string, Value *> NamedValues;
-static std::map<std::string, AllocaInst *> NamedValues;
+// static std::map<std::string, AllocaInst *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 
 // Global LLVM variables related to the generated code.
@@ -127,12 +127,10 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
   return TmpB.CreateAlloca(t, 0, VarName.c_str());
 }
 
-
 /* IR for ID */
 Value *IdExprAST::codegen() {
   // Look this variable up in the function.
-  std::cout << "Getting id: " << Name << std::endl;
-  Value *V = NamedValues[Name];
+  Value *V = context.locals()[Name];
   if (!V)
     LogErrorV("Unknown variable name");
   // return V;
@@ -141,13 +139,13 @@ Value *IdExprAST::codegen() {
 
 /* IR for int */
 Value *IntConst_ExprAST::codegen() {
-  std::cout << "Creating integer: " << Val << " in " <<  context.id << std::endl;
+  // std::cout << "Creating integer: " << Val << " in " <<  context.id << std::endl;
   return c16(Val);
 }
 
 /* IR for Char */
 Value *CharConst_ExprAST::codegen() {
-  std::cout << "Creating char: " << Val << std::endl;
+  // std::cout << "Creating char: " << Val << std::endl;
   return c8(Val);
 }
 
@@ -264,31 +262,40 @@ Function *FunctionAST::codegen() {
 
   if (!TheFunction->empty())
     return (Function*)LogErrorV("Function cannot be redefined.");
+
+  std::map<std::string, AllocaInst*> temp;
+  if ( context.id != 0 ) { 
+     temp = context.locals();
+  }
   
   // Create a new basic block to start insertion into.
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction, 0);
-  std::cout << Proto->getName() << "  push  " <<  context.id << std::endl;
+  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
   context.pushBlock(BB);
   Builder.SetInsertPoint(context.currentBlock());
 
+  if ( context.id > 1 ) {
+    context.locals() = temp;
+    for (std::map<std::string, AllocaInst*>::const_iterator it = (context.locals()).begin(); it != (context.locals()).end(); ++it ) {
+        // Create an alloca for this variable
+        AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, it->first, it->second->getAllocatedType());
+      }
+  }
+
   // Record the function arguments in the NamedValues map.
-  NamedValues.clear();
   for (auto &Arg : TheFunction->args()) {
     // Create an alloca for this variable
     AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName(), Arg.getType());
     // Store the initial value into alloca
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
-    NamedValues[Arg.getName()] = Alloca;
+    context.locals()[Arg.getName()] = Alloca;
   }
   
   if (Value *RetVal = Body->codegen()) {
-    // Builder.SetInsertPoint(context.currentBlock());
-
     // Finish off the function.
+    Builder.SetInsertPoint(context.currentBlock());
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
     context.popBlock();
-    std::cout << Proto->getName() << "  pop  " <<  context.id << std::endl;
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
@@ -379,20 +386,18 @@ Value *While_ExprAST::codegen() {
 }
 
 Value *Assignment_StmtAST::codegen() {
-  // IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS.get());
   IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS);
   if (!LHSE)
     return LogErrorV("destination of '=' must be a variable");
   Value *Val = RHS->codegen();
   if (!Val)
     return nullptr;
-  Value *Variable = NamedValues[LHSE->getName()];
+  Value *Variable = context.locals()[LHSE->getName()];
   if (!Variable)
     return LogErrorV("Unknown variable name");
   Builder.CreateStore(Val, Variable);
   return Val;
 }
-
 
 Value *PRINTAST::codegen() {
   Value *n = p->codegen();
@@ -424,10 +429,13 @@ Value *Statement::codegen() {
 }
 
 Value *Return::codegen() {
+  if ( expr == nullptr ) {
+    context.setCurrentReturnValue(nullptr);
+    return c32(0);
+  }
   Value *returnValue = expr->codegen();
-  // Builder.CreateRet(c32(0));
   context.setCurrentReturnValue(returnValue);
-  std::cout << " return  " <<  context.id << std::endl;
+  // std::cout << " return  " <<  context.id << std::endl;
   return returnValue;
 }
 
@@ -436,7 +444,6 @@ Function *VarDef::codegen() {
 }
 
 Value *FuncBody_AST::codegen() {
-  std::vector<AllocaInst *> OldBindings;
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
@@ -450,30 +457,23 @@ Value *FuncBody_AST::codegen() {
 
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
-      OldBindings.push_back(NamedValues[VarName]);
-
-      NamedValues[VarName] = Alloca;
+      context.locals()[VarName] = Alloca;
     }
     else if ( dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr ) {
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
+      Builder.SetInsertPoint(context.currentBlock());
       temp->codegen();
     }
   }
   
-  std::cout << "  func body start  " <<  context.id << std::endl;
+  // std::cout << "  func body start  " <<  context.id << std::endl;
   
   Builder.SetInsertPoint(context.currentBlock());
   Value *BodyVal = Body->codegen();
   
-  std::cout << "  func body end  " <<  context.id << std::endl;
+  // std::cout << "  func body end  " <<  context.id << std::endl;
   if (!BodyVal)
     return nullptr;
-
-  for ( unsigned i = 0, e = VarNames.size(); i != e; ++i )
-    if (dynamic_cast<VarDef *>(VarNames[i]) != nullptr ) {
-      VarDef *temp = dynamic_cast<VarDef *>(VarNames[i]);
-      NamedValues[temp->vdef.first] = OldBindings[i];
-    }
 
   return BodyVal;
 }
