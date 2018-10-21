@@ -76,8 +76,8 @@ CC ([^'\"\\]|{ES})
 
     /* {L}({D}|{L}|_)*         { yylval.s = yytext; return T_NAME; } */
     /* {L}({D}|{L}|_)*         { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; } */
-{L}({D}|{L}|_)*         { yylval.s = new std::string(yytext); return T_NAME; }
-{D}+                    { yylval.n = atoi(yytext); return T_const; }
+{L}({D}|{L}|_)*         { yylval.s = new std::string(yytext); return T_id; }
+{D}+                    { yylval.n = atoi(yytext); return T_INT_CONST; }
 
 \n                      { linenumber++;  /* ignore new lines */ }
 {W}+                    { /* ignore other white space */ }

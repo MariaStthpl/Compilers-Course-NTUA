@@ -26,6 +26,7 @@ static Function *TheWriteString;
 
 // Useful LLVM types.
 static Type *i8 = IntegerType::get(TheContext, 8);
+static Type *i16 = IntegerType::get(TheContext, 16);
 static Type *i32 = IntegerType::get(TheContext, 32);
 static Type *i64 = IntegerType::get(TheContext, 64);
 
@@ -38,6 +39,12 @@ inline ConstantInt *c32(int n)
 {
   return ConstantInt::get(TheContext, APInt(32, n, true));
 }
+inline ConstantInt *c16(int n)
+{
+  return ConstantInt::get(TheContext, APInt(16, n, true));
+}
+
+CodeGenContext context;
 
 void llvm_compile_and_dump(FunctionAST *t) {
   // Initialize the module and the optimization passes.
@@ -79,20 +86,8 @@ void llvm_compile_and_dump(FunctionAST *t) {
       Function::Create(writeString_type, Function::ExternalLinkage,
                        "writeString", TheModule.get());
   // Define and start the main function.
-  Constant *c = TheModule->getOrInsertFunction("main", i32, NULL);
-  Function *main = cast<Function>(c);
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", main);
-  Builder.SetInsertPoint(BB);
+  t->codegen();
 
-  // Emit the program code.
-  // t->Body->codegen();
-  // t->codegen();
-  t->Proto->codegen();
-  t->Body->codegen();
-
-  Builder.GetInsertBlock();
-  // Builder.SetInsertPoint(BB);
-  Builder.CreateRet(c32(0));
   // Verify and optimize the main function.
   bool bad = verifyModule(*TheModule, &errs());
   if (bad)
@@ -102,7 +97,7 @@ void llvm_compile_and_dump(FunctionAST *t) {
     TheModule->print(outs(), nullptr);
     return;
   }
-  TheFPM->run(*main);
+  // TheFPM->run(*main);
   // Print out the IR.
   TheModule->print(outs(), nullptr);
 }
@@ -126,17 +121,17 @@ Value *LogErrorV(const char *Str) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName) {
+static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, Type *t) {
   IRBuilder<> TmpB(&TheFunction->getEntryBlock(), 
                     TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getInt32Ty(getGlobalContext()), 0, 
-                    VarName.c_str());
+  return TmpB.CreateAlloca(t, 0, VarName.c_str());
 }
 
 
 /* IR for ID */
 Value *IdExprAST::codegen() {
   // Look this variable up in the function.
+  std::cout << "Getting id: " << Name << std::endl;
   Value *V = NamedValues[Name];
   if (!V)
     LogErrorV("Unknown variable name");
@@ -144,10 +139,16 @@ Value *IdExprAST::codegen() {
   return Builder.CreateLoad(V, Name.c_str());
 }
 
-/* IR for CONST */
-Value *ConstExprAST::codegen() {
-  // return ConstantFP::get(TheContext, APFloat(Val));
-  return c32(Val);
+/* IR for int */
+Value *IntConst_ExprAST::codegen() {
+  std::cout << "Creating integer: " << Val << " in " <<  context.id << std::endl;
+  return c16(Val);
+}
+
+/* IR for Char */
+Value *CharConst_ExprAST::codegen() {
+  std::cout << "Creating char: " << Val << std::endl;
+  return c8(Val);
 }
 
 /* IR for Binary Expressions */
@@ -167,11 +168,6 @@ Value *ArithmeticOp_ExprAST::codegen() {
     return Builder.CreateUDiv(L, R, "modtmp");
   case MOD:
     return Builder.CreateURem(L, R, "modtmp");
-  // case '<':
-  //   L = Builder.CreateFCmpULT(L, R, "cmptmp");
-  //   // Convert bool 0/1 to double 0.0 or 1.0
-  //   return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext),
-  //                               "booltmp");
   default:
     return LogErrorV("invalid binary operator");
   }
@@ -240,11 +236,10 @@ Value *CallExprAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-  // Make the function type:  double(double,double) etc.
-  std::vector<Type*> Ints(Args.size(),
-                             Type::getInt32Ty(TheContext));
+  std::vector<Type *> argTypes = getArgsTypes();
+
   FunctionType *FT =
-    FunctionType::get(Type::getInt32Ty(TheContext), Ints, false);
+    FunctionType::get(getType(), makeArrayRef(argTypes), false);
 
   Function *F =
     Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
@@ -252,14 +247,14 @@ Function *PrototypeAST::codegen() {
   // Set names for all arguments.
   unsigned Idx = 0;
   for (auto &Arg : F->args())
-    Arg.setName(Args[Idx++]);
+    Arg.setName(Args[Idx++].first);
   return F;
 }
 
+/* IR for func-decl */
 Function *FunctionAST::codegen() {
-    // First, check for an existing function from a previous 'extern' declaration.
+   // First, check for an existing function from a previous 'extern' declaration.
   Function *TheFunction = TheModule->getFunction(Proto->getName());
-  // std::cout << "FunName: " << Proto->getName() << std::endl;
 
   if (!TheFunction)
     TheFunction = Proto->codegen();
@@ -271,33 +266,29 @@ Function *FunctionAST::codegen() {
     return (Function*)LogErrorV("Function cannot be redefined.");
   
   // Create a new basic block to start insertion into.
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  Builder.SetInsertPoint(BB);
+  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction, 0);
+  std::cout << Proto->getName() << "  push  " <<  context.id << std::endl;
+  context.pushBlock(BB);
+  Builder.SetInsertPoint(context.currentBlock());
 
   // Record the function arguments in the NamedValues map.
   NamedValues.clear();
   for (auto &Arg : TheFunction->args()) {
     // Create an alloca for this variable
-    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName());
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Arg.getName(), Arg.getType());
     // Store the initial value into alloca
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
     NamedValues[Arg.getName()] = Alloca;
   }
-    // NamedValues[Arg.getName()] = &Arg;
-
-  // if ( Proto->getType() == typeVoid )
-  //   Builder.CreateRetVoid();
-  // if ( Proto->getType() == typeInteger )
-  //   Builder.CreateRet(c32(0));
   
   if (Value *RetVal = Body->codegen()) {
-    Builder.SetInsertPoint(BB);
-    Builder.GetInsertBlock();
-    
+    // Builder.SetInsertPoint(context.currentBlock());
 
     // Finish off the function.
-    Builder.CreateRet(RetVal);
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
+    context.popBlock();
+    std::cout << Proto->getName() << "  pop  " <<  context.id << std::endl;
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
@@ -308,19 +299,6 @@ Function *FunctionAST::codegen() {
   TheFunction->eraseFromParent();
 
   return nullptr;
-}
-
-Value *SeqExprAST::codegen() {
-  Value *last = nullptr;
-  if (FIRST)
-    last = FIRST->codegen();
-  if(SECOND) {
-    last = SECOND->codegen();
-    return last;
-  }
-    // SECOND->codegen();
-  return nullptr;
-  // return c32(1);
 }
 
 Value *If_ExprAST::codegen() {
@@ -423,7 +401,7 @@ Value *PRINTAST::codegen() {
   Value *idxList[] = {c32(0), c32(0)};
   Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
   Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  return c32(0);
+  return n;
   // return (ConstantFP::get(TheContext, APFloat(0.0));
 }
 
@@ -445,39 +423,57 @@ Value *Statement::codegen() {
   return expr.codegen();
 }
 
-Value *VarDef::codegen() {
+Value *Return::codegen() {
+  Value *returnValue = expr->codegen();
+  // Builder.CreateRet(c32(0));
+  context.setCurrentReturnValue(returnValue);
+  std::cout << " return  " <<  context.id << std::endl;
+  return returnValue;
+}
+
+Function *VarDef::codegen() {
+  return nullptr;
+}
+
+Value *FuncBody_AST::codegen() {
   std::vector<AllocaInst *> OldBindings;
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
   // Register all variables and emit their initializer
   for ( unsigned i = 0, e = VarNames.size(); i != e; ++i ) {
-    const std::string &VarName = VarNames[i].first;
-    // ExprAST *Init = VarNames[i].second.get();
-    ExprAST *Init = VarNames[i].second;
+    if (dynamic_cast<VarDef *>(VarNames[i]) != nullptr ) {
+      VarDef *temp = dynamic_cast<VarDef *>(VarNames[i]);
+      
+      const std::string &VarName = temp->vdef.first;
+      Type *t = temp->vdef.second;
 
-    Value *InitVal;
-    if (Init) {
-      InitVal = Init->codegen();
-      if (!InitVal)
-        return nullptr;
-    } else {
-      InitVal = c32(0);
+      AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
+
+      OldBindings.push_back(NamedValues[VarName]);
+
+      NamedValues[VarName] = Alloca;
     }
-
-    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
-    Builder.CreateStore(InitVal, Alloca);
-
-    OldBindings.push_back(NamedValues[VarName]);
-
-    NamedValues[VarName] = Alloca;
+    else if ( dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr ) {
+      FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
+      temp->codegen();
+    }
   }
-
+  
+  std::cout << "  func body start  " <<  context.id << std::endl;
+  
+  Builder.SetInsertPoint(context.currentBlock());
   Value *BodyVal = Body->codegen();
+  
+  std::cout << "  func body end  " <<  context.id << std::endl;
   if (!BodyVal)
     return nullptr;
+
   for ( unsigned i = 0, e = VarNames.size(); i != e; ++i )
-    NamedValues[VarNames[i].first] = OldBindings[i];
+    if (dynamic_cast<VarDef *>(VarNames[i]) != nullptr ) {
+      VarDef *temp = dynamic_cast<VarDef *>(VarNames[i]);
+      NamedValues[temp->vdef.first] = OldBindings[i];
+    }
 
   return BodyVal;
 }

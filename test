@@ -1,9 +1,6 @@
-main() : proc
-x = 1;
-y = 3;
+main() : int
+lala() : int { print 4; return 4;} 
 {
-    --if (true)
-    print x;
-    print y;
-    --main();
+    print 5;
+    return 5;
 }

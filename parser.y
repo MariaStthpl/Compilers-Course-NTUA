@@ -12,22 +12,28 @@ extern int linenumber;
 FunctionAST *t;
 %}
 
-%expect 2 // 1 - if else, 1 - var_def
+%expect 9 // 1 - if else, 1 - var_def, 6 - stmt_list, 1 - return
 %union{
   ExprAST *e;
   std::vector<ExprAST*> *vec;
   FunctionAST *f;
+  
+  Type *t;
+  std::pair<std::string, Type *> *fpar;
+  std::vector<std::pair<std::string, Type *>> *vfpar;
 
-  SeqExprAST *seq;
   LocalDef_AST *ld;
+  VarDef *vardef;
 
   Block *block;
   StmtAST *stmt;
   // std::vector<StmtAST*> stmtvec;
 
-  std::vector<std::pair<std::string, ExprAST *>> *vdef;
+  // std::vector<std::pair<std::string, ExprAST *>> *vdef;
+  std::vector<LocalDef_AST *> *vdef;
+
   std::pair<std::string, ExprAST *> *def;
-  VarDef *fb;
+  FuncBody_AST *fb;
 
   IdExprAST *id;
 
@@ -36,7 +42,7 @@ FunctionAST *t;
   std::string *s;
   std::vector<std::string> *svec;
   int n;
-  Stype t;
+  // Stype t;
   // struct vars {
   //   char *s;
   //   int offset;
@@ -53,9 +59,10 @@ FunctionAST *t;
 %token T_end "end"
 %token T_var "var"
 %token T_bool "bool"
-%token<c> T_id
+%token<s> T_id
 %token<n> T_const
 %token<s> T_NAME
+%token<n> T_INT_CONST
 %token<n> T_CHAR
 %token<s> T_STRING
 
@@ -75,11 +82,11 @@ FunctionAST *t;
 %type<block> stmt_list
 %type<stmt> stmt
 %type<e> expr
-%type<svec> fpar_list
-%type<s> fpar_def
+%type<vfpar> fpar_list
+%type<fpar> fpar_def
 %type<vdef> local_def
-%type<def> var_def
-// %type<t> var_type
+%type<vardef> var_def
+%type<t> var_type
 %type<stmt> func_call
 %type<vec> expr_list
 // %type<variable> l_value
@@ -88,7 +95,7 @@ FunctionAST *t;
 // %type<a> ret_value
 %type<e> cond
 %type<t> data_type
-// %type<t> type
+%type<t> type
 %type<t> r_type
 
 %%
@@ -96,56 +103,59 @@ program:
   func_def                            { t = $$ = $1; }
 ;
 
-// program:
-//   stmt_list                           { t = $$ = $1; }
-// ;
-
 func_def:
-  T_NAME '(' fpar_list ')'':' r_type func_body    { $$ = new FunctionAST(new PrototypeAST(*$1, *$3), $7); } 
+  T_id '(' fpar_list ')'':' r_type 
+  func_body                           { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
 ;
 
 func_body:
-  local_def compound_stmt             { $$ = new VarDef(*$1, $2); } //{ $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); if ($<stmt>2 != NULL) $$->Block::statements.push_back($<stmt>2); }//{ $$ = new SeqExprAST($1, $2); }
+  local_def compound_stmt             { $$ = new FuncBody_AST(*$1, $2); }
 ;
 
 fpar_def:
-//   T_NAME ':' type                     { $$ = $1; }
-// | T_NAME ':' TREFERENCE type          { $$ = $1; }
-  T_NAME                              { $$ = $1; }
+  T_id ':' type                     { $$ = new std::pair<std::string, Type*>(*$1, $3); }
+// | T_id ':' TREFERENCE type          { $$ = $1; }
+  // T_id                                { $$ = $1; }
 ;
 
 fpar_list:
-  /* nothing */                       { $$ = new std::vector<std::string>(); }
-| fpar_def                            { $$ = new std::vector<std::string>(); $$->push_back(*$1); }
-| fpar_list ',' fpar_def              { $$ = nullptr; }
+  /* nothing */                       { $$ = new std::vector<std::pair<std::string, Type*>>(); }
+| fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
+| fpar_list ',' fpar_def              { $1->push_back(*$3); }
 ;
 
+// fpar_list:
+//   /* nothing */                       { $$ = new std::vector<std::string>(); }
+// | fpar_def                            { $$ = new std::vector<std::string>(); $$->push_back(*$1); }
+// | fpar_list ',' fpar_def              { $$ = nullptr; }
+// ;
+
 local_def:
-  /* nothing */                       { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); }
-// | func_def                            { $$ = $1; } 
-| var_def                             { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back(*$1); }
+  /* nothing */                       { $$ = new std::vector<LocalDef_AST *>(); }
+| func_def                            { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
+| var_def                             { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
 // | var_def ';' local_def               { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back }
-| local_def  var_def               { $1->push_back(*$2); }
+| local_def var_def                   { $1->push_back($<ld>2); }
 ;
 
 var_def:
-  // T_NAME ':' var_type                 {  }
-  T_NAME '=' expr ';'                 { $$ = new std::pair<std::string, ExprAST*>(*$1, $3);  }
+  T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>(*$1, $3));  }
+  // T_id '=' expr ';'                 { $$ = new VarDef(std::pair<std::string, ExprAST*>(*$1, $3));  }
 ;
 
-// var_type:
-//   data_type                           {  }
+var_type:
+  data_type                           { $$ = $1; }
 // | data_type '[' T_const ']'           {  } 
-// ;
+;
 
 data_type:
-  TINT                                { $$ = typeInteger; }
-| TBYTE                               { $$ = typeInteger; }
+  TINT                                { $$ = Type::getInt16Ty(getGlobalContext()); }
+| TBYTE                               { $$ = Type::getInt8Ty(getGlobalContext()); }
 ;
 
 r_type:
   data_type                           { $$ = $1; }
-| TPROC                               { $$ = typeVoid; }
+| TPROC                               { $$ = Type::getVoidTy(getGlobalContext()); }
 ;
 
 compound_stmt:
@@ -153,24 +163,26 @@ compound_stmt:
 ;
 
 stmt_list:
-  stmt                                { $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); }
+  /* nothing */                       { $$ = new Block(); }
+| stmt                                { $$ = new Block(); if ($<stmt>1 != NULL) $$->Block::statements.push_back($<stmt>1); }
 | stmt_list stmt                      { if ($<stmt>2 != NULL) $1->statements.push_back($<stmt>2); }
 ;
 
 stmt:
   ';'                                 { $$ = NULL; }
-// | l_value '=' expr ';'                { $$ = ast_let($1, $3); }         // Anathesi
+| l_value '=' expr ';'                { $$ = new Assignment_StmtAST($1, $3); }
 | compound_stmt                       { $$ = $1; }
 | func_call ';'                       { $$ = $1; }
 | TIF '(' cond ')' stmt               { $$ = new If_ExprAST($3, $5, NULL);  }
 | TIF '(' cond ')' stmt TELSE stmt    { $$ = new If_ExprAST($3, $5, $7);  }
 | TWHILE '(' cond ')' stmt            { $$ = new While_ExprAST($3, $5); }       // while loop
-// | TRETURN ret_value ';'               {  }      //???????
+| TRETURN expr ';'                    { $$ = new Return($2); }      //???????
+// | TRETURN ';'                         { $$ = new Return(NULL); }      //???????
 | "print" expr ';'                    { $$ = new PRINTAST($2); }
 ;
 
 l_value:
-  T_NAME                              { $$ = new IdExprAST(*$1); }
+  T_id                              { $$ = new IdExprAST(*$1); }
 // | T_NAME '[' expr ']'                 {  }
 // // | T_STRING                            { $$ = $1; }
 ;
@@ -181,7 +193,7 @@ l_value:
 // ;
 
 func_call:
-  T_NAME '(' expr_list ')'            { $$ = new CallExprAST(*$1, *$3); }
+  T_id '(' expr_list ')'            { $$ = new CallExprAST(*$1, *$3); }
 ;
 
 expr_list :
@@ -191,8 +203,8 @@ expr_list :
 ;
 
 expr:
-  T_const                             { $$ = new ConstExprAST($1); }
-// | T_CHAR                              {  }
+  T_INT_CONST                         { $$ = new IntConst_ExprAST($1); }
+| T_CHAR                              { $$ = new CharConst_ExprAST($1); }
 | l_value                             { $$ = $1; }
 | '(' expr ')'                        { $$ = $2; }
 | expr '+' expr                       { $$ = new ArithmeticOp_ExprAST($1, PLUS, $3); }
@@ -200,13 +212,13 @@ expr:
 | expr '*' expr                       { $$ = new ArithmeticOp_ExprAST($1, TIMES, $3); }
 | expr '/' expr                       { $$ = new ArithmeticOp_ExprAST($1, DIV, $3); }
 | expr '%' expr                       { $$ = new ArithmeticOp_ExprAST($1, MOD, $3); }
-| '+' expr                            { $$ = new ArithmeticOp_ExprAST(new ConstExprAST(0), PLUS, $2); }   %prec UPLUS
-| '-' expr                            { $$ = new ArithmeticOp_ExprAST(new ConstExprAST(0), MINUS, $2); }  %prec UMINUS
+| '+' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, $2); }   %prec UPLUS
+| '-' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, $2); }  %prec UMINUS
 ;
 
 cond:
-  TTRUE                               { $$ = new ComparisonOp_ExprAST(new ConstExprAST(0), L, new ConstExprAST(1)); }
-| TFALSE                              { $$ = new ComparisonOp_ExprAST(new ConstExprAST(1), L, new ConstExprAST(0)); }
+  TTRUE                               { $$ = new ComparisonOp_ExprAST(new IntConst_ExprAST(0), L, new IntConst_ExprAST(1)); }
+| TFALSE                              { $$ = new ComparisonOp_ExprAST(new IntConst_ExprAST(1), L, new IntConst_ExprAST(0)); }
 | '(' cond ')'                        { $$ = $2;                                                                    }
 | '!' cond                            { $$ = new LogicalOp_ExprAST($2, NOT, $2);                                    }
 | expr '<' expr                       { $$ = new ComparisonOp_ExprAST($1, L, $3);                                   }
@@ -219,10 +231,10 @@ cond:
 | cond '|' cond                       { $$ = new LogicalOp_ExprAST($1, OR, $3);                                     }
 ;
 
-// type:
-//   data_type                           {  }
+type:
+  data_type                           { $$ = $1; }
 // | data_type '['']'                    {  }
-// ;
+;
 
 %%
 

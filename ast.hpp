@@ -9,6 +9,7 @@ extern "C"{
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <stack>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -22,6 +23,32 @@ extern "C"{
 #endif
 
 using namespace llvm;
+
+class CodeGenBlock {
+  public:
+    BasicBlock *block;
+    Value *returnValue;
+};
+
+class CodeGenContext {
+  std::stack<CodeGenBlock *> blocks;
+  Function *mainFunction;
+  public:
+    int id = 0;
+    Module *module;
+    CodeGenContext() { }
+    BasicBlock *currentBlock() { return blocks.top()->block; }
+    void pushBlock(BasicBlock *block) { 
+        blocks.push(new CodeGenBlock()); blocks.top()->returnValue = NULL;
+        blocks.top()->block = block;
+        id++;
+        }
+    void popBlock() { CodeGenBlock *top = blocks.top(); blocks.pop(); delete top; id--; }
+    void setCurrentReturnValue(Value *value) { blocks.top()->returnValue = value; }
+    Value *getCurrentReturnValue() { return blocks.top()->returnValue; }
+};
+
+extern CodeGenContext context;
 
 typedef enum {
   PRINT, LET, WHILE, IF, SEQ, FUN,
@@ -79,10 +106,17 @@ class IdExprAST : public ExprAST {
     const std::string &getName() const { return Name; }
 };
 
-class ConstExprAST : public ExprAST {
-  double Val;
+class IntConst_ExprAST : public ExprAST {
+  int Val;
   public:
-    ConstExprAST(double Val): Val(Val){};
+    IntConst_ExprAST(double Val): Val(Val){};
+    virtual Value *codegen() override;
+};
+
+class CharConst_ExprAST : public ExprAST {
+  int Val;
+  public:
+    CharConst_ExprAST(double Val): Val(Val){};
     virtual Value *codegen() override;
 };
 
@@ -133,6 +167,13 @@ class Statement: public StmtAST {
     virtual Value *codegen() override;
 };
 
+class Return: public StmtAST {
+  public:
+    ExprAST *expr;
+    Return(ExprAST *expr): expr(expr) { }
+    virtual Value *codegen() override;
+};
+
 class If_ExprAST: public StmtAST {
   ExprAST *Cond;
   StmtAST *Then, *Else;
@@ -176,53 +217,56 @@ class CallExprAST : public StmtAST {
 // PrototypeAST - This class represents the "prototype" for a function, which captures its name,
 // and its argument names (thus implicitly the number of arguments the function takes).
 class PrototypeAST {
-  // Stype type = typeVoid;
+  Type *t;
   std::string Name;
-  std::vector<std::string> Args;
+  // std::vector<std::string> Args;
+  std::vector<std::pair<std::string, Type*>> Args;
   public:
-    PrototypeAST(const std::string &name, std::vector<std::string> Args)
-      : Name(name), Args(std::move(Args)) {}
+    PrototypeAST(Type *t, const std::string &name, std::vector<std::pair<std::string, Type*>> Args)
+      : t(t), Name(name), Args(std::move(Args)) {}
     Function *codegen();
     const std::string &getName() const { return Name; }
-    // Stype getType() { return type; }
+    Type *getType() { return t; }
+    std::vector<Type *> getArgsTypes() { 
+          std::vector<Type *> argTypes;
+          std::vector<std::pair<std::string, Type *>>::const_iterator it;
+          for (it = Args.begin(); it != Args.end(); it++)
+            argTypes.push_back((*it).second);
+            return argTypes;
+     };
 };
+
+class FunctionAST;
 
 class LocalDef_AST { 
   public:
-  virtual ~LocalDef_AST() {}
-  virtual Function *codegen() = 0;
+    virtual Function *codegen() = 0;
 };
 
-class VarDef {
-  std::vector<std::pair<std::string, ExprAST *>> VarNames;
+class VarDef: public LocalDef_AST, public StmtAST {
+  public:
+  std::pair<std::string, Type *> vdef;
+    VarDef(std::pair<std::string, Type *> vdef): vdef(std::move(vdef)) { }
+    virtual Function *codegen() override;
+};
+
+class FuncBody_AST {
+  std::vector<LocalDef_AST *> VarNames;
   Block *Body;
   public:
-    VarDef(std::vector<std::pair<std::string, ExprAST*>> VarNames, Block *Body) : VarNames(std::move(VarNames)), Body(std::move(Body)) { }
+    FuncBody_AST(std::vector<LocalDef_AST *> VarNames, Block *Body) : VarNames(std::move(VarNames)), Body(std::move(Body)) { }
     Value *codegen();
-};
-
-class SeqExprAST: public StmtAST {
-  LocalDef_AST *FIRST;
-  StmtAST *SECOND;
-  public:
-    SeqExprAST(LocalDef_AST *FIRST, StmtAST *SECOND) : FIRST(std::move(FIRST)), SECOND(std::move(SECOND)){}
-    virtual Value *codegen() override;
 };
 
 /// FunctionAST - This class represents a function definition itself.
 class FunctionAST: public LocalDef_AST {
-  // PrototypeAST *Proto;
-  // SeqExprAST *Body;
   public:
     PrototypeAST *Proto;
-    VarDef *Body;
-    FunctionAST(PrototypeAST *Proto, VarDef *Body)
+    FuncBody_AST *Body;
+    FunctionAST(PrototypeAST *Proto, FuncBody_AST *Body)
       : Proto(std::move(Proto)), Body(Body) {}
-    virtual Function *codegen() override;
+    Function *codegen() override;
 };
-
-
-
 
 void llvm_compile_and_dump (FunctionAST *t);
 
