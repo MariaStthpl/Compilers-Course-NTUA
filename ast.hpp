@@ -115,6 +115,17 @@ class IntConst_ExprAST : public ExprAST {
     virtual Value *codegen() override;
 };
 
+
+class ArrayElementExprAST : public ExprAST {
+  std::string Name;
+  ExprAST* expr;
+  public:
+    ArrayElementExprAST(const std::string &Name, ExprAST* expr) : Name(Name), expr(expr) {}
+    virtual Value *codegen() override;
+    const std::string &getName() const { return Name; }
+    Value *getExpr() { return expr->codegen(); }
+};
+
 class CharConst_ExprAST : public ExprAST {
   int Val;
   public:

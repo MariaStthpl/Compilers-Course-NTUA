@@ -71,8 +71,7 @@ FunctionAST *t;
 %type<t> var_type
 %type<stmt> func_call
 %type<vexpr> expr_list
-// %type<variable> l_value
-%type<id> l_value
+%type<expr> l_value
 
 // %type<a> ret_value
 %type<expr> cond
@@ -116,19 +115,17 @@ local_def:
   /* nothing */                       { $$ = new std::vector<LocalDef_AST *>(); }
 | func_def                            { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
 | var_def                             { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
-// | var_def ';' local_def               { $$ = new std::vector<std::pair<std::string, ExprAST *>>(); $$->push_back }
 | local_def var_def                   { $1->push_back($<ld>2); }
 | local_def func_def                   { $1->push_back($<ld>2); }
 ;
 
 var_def:
   T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>(*$1, $3));  }
-  // T_id '=' expr ';'                 { $$ = new VarDef(std::pair<std::string, ExprAST*>(*$1, $3));  }
 ;
 
 var_type:
   data_type                           { $$ = $1; }
-// | data_type '[' T_const ']'           {  } 
+| data_type '[' T_INT_CONST ']'       { $$ = ArrayType::get($1, $3); } 
 ;
 
 data_type:
@@ -166,7 +163,7 @@ stmt:
 
 l_value:
   T_id                              { $$ = new IdExprAST(*$1); }
-// | T_NAME '[' expr ']'                 {  }
+| T_id '[' expr ']'                 { $$ = new ArrayElementExprAST(*$1, $3); }
 // // | T_STRING                            { $$ = $1; }
 ;
 

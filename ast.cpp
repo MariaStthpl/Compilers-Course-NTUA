@@ -133,8 +133,15 @@ Value *IdExprAST::codegen() {
   Value *V = context.locals()[Name];
   if (!V)
     LogErrorV("Unknown variable name");
-  // return V;
   return Builder.CreateLoad(V, Name.c_str());
+}
+
+Value *ArrayElementExprAST::codegen() {
+  AllocaInst* arr = context.locals()[Name];
+  Value* index = expr->codegen();
+  Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+  GetElementPtrInst* gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  return Builder.CreateLoad(gepInst, Name);
 }
 
 /* IR for int */
@@ -278,6 +285,7 @@ Function *FunctionAST::codegen() {
     for (std::map<std::string, AllocaInst*>::const_iterator it = (context.locals()).begin(); it != (context.locals()).end(); ++it ) {
         // Create an alloca for this variable
         AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, it->first, it->second->getAllocatedType());
+        context.locals()[it->first] = Alloca;
       }
   }
 
@@ -386,16 +394,26 @@ Value *While_ExprAST::codegen() {
 }
 
 Value *Assignment_StmtAST::codegen() {
-  IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS);
-  if (!LHSE)
-    return LogErrorV("destination of '=' must be a variable");
   Value *Val = RHS->codegen();
   if (!Val)
     return nullptr;
-  Value *Variable = context.locals()[LHSE->getName()];
-  if (!Variable)
-    return LogErrorV("Unknown variable name");
-  Builder.CreateStore(Val, Variable);
+
+  ArrayElementExprAST *LHSA = dynamic_cast<ArrayElementExprAST *>(LHS);  
+  if (!LHSA) {
+    IdExprAST *LHSE = dynamic_cast<IdExprAST*>(LHS);
+    if (!LHSE)
+      return LogErrorV("destination of '=' is not a variable");
+    Value *Variable = context.locals()[LHSE->getName()];
+    if (!Variable)
+      return LogErrorV("Unknown variable name");
+    Builder.CreateStore(Val, Variable);
+  } else {
+    AllocaInst* arr = context.locals()[LHSA->getName()];
+    Value* index = LHSA->getExpr();
+    Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+    GetElementPtrInst* gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), LHSA->getName(), context.currentBlock());
+    Builder.CreateStore(Val, gepInst);
+  }
   return Val;
 }
 
