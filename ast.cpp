@@ -21,8 +21,13 @@ static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 // Global LLVM variables related to the generated code.
 static GlobalVariable *TheVars;
 static GlobalVariable *TheNL;
+
 static Function *TheWriteInteger;
+// static Function *TheWriteByte;
 static Function *TheWriteString;
+static Function *TheReadInteger;
+// static Function *TheReadByte;
+static Function *TheReadString;
 
 // Useful LLVM types.
 static Type *i8 = IntegerType::get(TheContext, 8);
@@ -71,13 +76,21 @@ void llvm_compile_and_dump(FunctionAST *t) {
                          std::vector<Constant *>{c8('\n'), c8('\0')}),
       "nl");
   TheNL->setAlignment(1);
+  /* ------------------ declare library of functions --------------------------*/
   // declare void @writeInteger(i64)
   FunctionType *writeInteger_type =
       FunctionType::get(Type::getVoidTy(TheContext),
-                        std::vector<Type *>{i64}, false);
+                        std::vector<Type *>{i16}, false);
   TheWriteInteger =
       Function::Create(writeInteger_type, Function::ExternalLinkage,
                        "writeInteger", TheModule.get());
+  // declare void @writeByte(i8)
+  // FunctionType *writeByte_type =
+  //     FunctionType::get(Type::getVoidTy(TheContext),
+  //                       std::vector<Type *>{i8}, false);
+  // TheWriteByte =
+  //     Function::Create(writeByte_type, Function::ExternalLinkage,
+  //                      "writeInteger", TheModule.get());
   // declare void @writeString(i8*)
   FunctionType *writeString_type =
       FunctionType::get(Type::getVoidTy(TheContext),
@@ -85,6 +98,19 @@ void llvm_compile_and_dump(FunctionAST *t) {
   TheWriteString =
       Function::Create(writeString_type, Function::ExternalLinkage,
                        "writeString", TheModule.get());
+
+  FunctionType *readInteger_type =
+    FunctionType::get(Type::getInt8Ty(TheContext),
+                        std::vector<Type *>(), false);
+  TheReadInteger =
+      Function::Create(readInteger_type, Function::ExternalLinkage,
+                       "readInteger", TheModule.get());
+  // FunctionType *readByte_type =
+  //   FunctionType::get(Type::getInt8Ty(TheContext),
+  //                       std::vector<Type *>(), false);
+  // TheReadByte =
+  //     Function::Create(readByte_type, Function::ExternalLinkage,
+  //                      "readInteger", TheModule.get());
   // Define and start the main function.
   t->codegen();
 
@@ -130,9 +156,23 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
 /* IR for ID */
 Value *IdExprAST::codegen() {
   // Look this variable up in the function.
-  Value *V = context.locals()[Name];
+  AllocaInst *V = context.locals()[Name];
   if (!V)
     LogErrorV("Unknown variable name");
+  if ( ArrayType::classof(V->getAllocatedType()) ) {
+    AllocaInst* arr = context.locals()[Name];
+    Value* index = c16(0);
+    Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+    return GetElementPtrInst::CreateInBounds(V->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  }
+  // if ( PointerType::classof(V->getAllocatedType()) ) {
+  //   dyn_cast<ArrayType>(V->getAllocatedType());
+  //   AllocaInst* arr = context.locals()[Name];
+  //   Value* index = c16(0);
+  //   Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+  //   return Builder.CreateGEP(arr, ArrayRef<Value*>(indexList, 2), Name);
+  //   // return GetElementPtrInst::CreateInBounds(V->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  // }
   return Builder.CreateLoad(V, Name.c_str());
 }
 
@@ -140,8 +180,24 @@ Value *ArrayElementExprAST::codegen() {
   AllocaInst* arr = context.locals()[Name];
   Value* index = expr->codegen();
   Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
-  GetElementPtrInst* gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  if ( PointerType::classof(arr->getAllocatedType()) ) {
+    // return Builder.CreateLoad(arr, Name.c_str());
+    GetElementPtrInst* gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+    return Builder.CreateLoad(gepInst, Name);
+  }
+  GetElementPtrInst* gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  // Value *gepInst = Builder.CreateGEP(arr, ArrayRef<Value*>(indexList, 2), Name);
   return Builder.CreateLoad(gepInst, Name);
+  // Value* gepInst = Builder.CreateInBoundsGEP(arr, ArrayRef<Value*>(indexList, 2), Name);
+  // return Builder.CreateLoad(gepInst, Name);
+
+
+  // AllocaInst* arr = context.locals()[Name];
+  // Value* index = expr->codegen();
+  // Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+  // return Builder.CreateExtractValue(arr,ArrayRef<unsigned int>(0));
+  // GetElementPtrInst* gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), Name, context.currentBlock());
+  // return Builder.CreateLoad(gepInst, Name);
 }
 
 /* IR for int */
@@ -185,13 +241,13 @@ Value *ComparisonOp_ExprAST::codegen() {
     return nullptr;
   switch (Op) {
   case L:
-    return Builder.CreateICmpULT(l, r, "ltmp");    
+    return Builder.CreateICmpSLT(l, r, "ltmp");    
   case G:
-    return Builder.CreateICmpUGT(l, r, "gtmp");
+    return Builder.CreateICmpSGT(l, r, "gtmp");
   case LE:
-    return Builder.CreateICmpULE(l, r, "letmp");
+    return Builder.CreateICmpSLE(l, r, "letmp");
   case GE:
-    return Builder.CreateICmpUGE(l, r, "getmp");
+    return Builder.CreateICmpSGE(l, r, "getmp");
   case EQ:
     return Builder.CreateICmpEQ(l, r, "eqtmp");
   case NE:
@@ -231,8 +287,18 @@ Value *CallExprAST::codegen() {
     return LogErrorV("Incorrect # arguments passed");
 
   std::vector<Value *> ArgsV;
+  FunctionType *FTy = CalleeF->getFunctionType();
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgsV.push_back(Args[i]->codegen());
+    // if ( FTy->getParamType(i)->isPointerTy() ) {
+      // pass pointer
+      // IdExprAST *temp = dynamic_cast<IdExprAST*>(Args[i]);
+      // AllocaInst* arr = context.locals()[temp->getName()];
+      // Value* index = c16(0);
+      // Value* indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+      // GetElementPtrInst* gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value*>(indexList, 2), temp->getName().c_str(), context.currentBlock());
+      // ArgsV.push_back(gepInst);
+    // } else
+      ArgsV.push_back(Args[i]->codegen());
     if (!ArgsV.back())
       return nullptr;
   }
@@ -326,12 +392,14 @@ Value *If_ExprAST::codegen() {
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
   BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+  context.pushBlock(ThenBB);
   BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
   BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
 
   Builder.CreateCondBr(CondV, ThenBB, ElseBB);
 
-  Builder.SetInsertPoint(ThenBB);
+  // Builder.SetInsertPoint(ThenBB);
+  Builder.SetInsertPoint(context.currentBlock());
   Value *ThenV = Then->codegen();
   
   if (!ThenV)
@@ -342,7 +410,9 @@ Value *If_ExprAST::codegen() {
   ThenBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(ElseBB);
-  Builder.SetInsertPoint(ElseBB);
+  context.pushBlock(ElseBB);
+  // Builder.SetInsertPoint(ElseBB);
+  Builder.SetInsertPoint(context.currentBlock());
   
   Value *ElseV = nullptr;
   if ( Else != nullptr ) {
@@ -356,7 +426,9 @@ Value *If_ExprAST::codegen() {
   ElseBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(MergeBB);
-  Builder.SetInsertPoint(MergeBB);
+  context.pushBlock(MergeBB);
+  // Builder.SetInsertPoint(MergeBB);
+  Builder.SetInsertPoint(context.currentBlock());
   return c32(0);
 }
 
@@ -417,15 +489,37 @@ Value *Assignment_StmtAST::codegen() {
   return Val;
 }
 
-Value *PRINTAST::codegen() {
+Value *WriteInteger::codegen() {
   Value *n = p->codegen();
-  Value *n64 = Builder.CreateZExt(n, i64, "ext");
-  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n64});
+  // Value *n64 = Builder.CreateZExt(n, i64, "ext");
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
   Value *idxList[] = {c32(0), c32(0)};
   Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
   Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return n;
-  // return (ConstantFP::get(TheContext, APFloat(0.0));
+}
+
+Value *WriteByte::codegen() {
+  Value *n = p->codegen();
+  Value *n16 = Builder.CreateZExt(n, i16, "ext");
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
+  return n;
+}
+
+Value *ReadInteger::codegen() {
+  Value* r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
+  Builder.CreateIntCast(r, i16, false, "ext");
+}
+
+Value *ReadByte::codegen() {
+  return Builder.CreateCall(TheReadInteger, std::vector<Value *>());
+}
+
+Value *Shrink::codegen() {
+  // return Builder.CreateZExt(n, i8, "ext");
 }
 
 /* ------------------- StmtAST --------------------- */

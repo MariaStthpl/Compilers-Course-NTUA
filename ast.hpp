@@ -210,11 +210,44 @@ class Assignment_StmtAST: public StmtAST {
     Value *codegen() override;
 };
 
-class PRINTAST: public StmtAST {
+class WriteInteger: public StmtAST {
   ExprAST *p;
   public:
-    PRINTAST(ExprAST *p): p(std::move(p)) {}
+    WriteInteger(ExprAST *p): p(std::move(p)) {}
     virtual Value *codegen() override;
+};
+
+class WriteByte: public StmtAST {
+  ExprAST *p;
+  public:
+    WriteByte(ExprAST *p): p(std::move(p)) {}
+    virtual Value *codegen() override;
+};
+
+class ReadInteger: public ExprAST {
+  public:
+    ReadInteger() {}
+    virtual Value *codegen() override;
+};
+
+class ReadByte: public ExprAST {
+  public:
+    ReadByte() {}
+    virtual Value *codegen() override;
+};
+
+class Extend: public ExprAST {
+  ExprAST* expr;
+  public:
+  Extend(ExprAST* expr): expr(std::move(expr)) {}
+  virtual Value *codegen() override;
+};
+
+class Shrink: public ExprAST {
+  ExprAST* expr;
+  public:
+  Shrink(ExprAST* expr): expr(std::move(expr)) {}
+  virtual Value *codegen() override;
 };
 
 class CallExprAST : public StmtAST, public ExprAST {

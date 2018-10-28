@@ -12,7 +12,7 @@ extern int linenumber;
 FunctionAST *t;
 %}
 
-%expect 9 // 1 - if else, 1 - var_def, 6 - stmt_list, 1 - return
+%expect 10 // 1 - if else, 1 - var_def, 6 - stmt_list, 1 - return, 1 - WriteInteger
 %union{
   IdExprAST *id;
 
@@ -96,7 +96,6 @@ func_body:
 fpar_def:
   T_id ':' type                     { $$ = new std::pair<std::string, Type*>(*$1, $3); }
 // | T_id ':' TREFERENCE type          { $$ = $1; }
-  // T_id                                { $$ = $1; }
 ;
 
 fpar_list:
@@ -105,11 +104,10 @@ fpar_list:
 | fpar_list ',' fpar_def              { $1->push_back(*$3); }
 ;
 
-// fpar_list:
-//   /* nothing */                       { $$ = new std::vector<std::string>(); }
-// | fpar_def                            { $$ = new std::vector<std::string>(); $$->push_back(*$1); }
-// | fpar_list ',' fpar_def              { $$ = nullptr; }
-// ;
+type:
+  data_type                           { $$ = $1; }
+| data_type '[' ']'                   { $$ = PointerType::getUnqual($1); }
+;
 
 local_def:
   /* nothing */                       { $$ = new std::vector<LocalDef_AST *>(); }
@@ -158,7 +156,8 @@ stmt:
 | TWHILE '(' cond ')' stmt            { $$ = new While_ExprAST($3, $5); }
 | TRETURN expr ';'                    { $$ = new Return($2); }
 | TRETURN ';'                         { $$ = new Return(nullptr); } 
-| "print" expr ';'                    { $$ = new PRINTAST($2); }
+| TW_INT '(' expr ')' ';'             { $$ = new WriteInteger($3); }
+| TW_BYTE '(' expr ')' ';'            { $$ = new WriteByte($3); }
 ;
 
 l_value:
@@ -195,6 +194,8 @@ expr:
 | expr '%' expr                       { $$ = new ArithmeticOp_ExprAST($1, MOD, $3); }
 | '+' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, $2); }   %prec UPLUS
 | '-' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, $2); }  %prec UMINUS
+| TR_INT '(' ')'                      { $$ = new ReadInteger(); }
+| TR_BYTE '(' ')'                     { $$ = new ReadByte(); }
 ;
 
 cond:
@@ -210,11 +211,6 @@ cond:
 | expr NEQ_OP expr                    { $$ = new ComparisonOp_ExprAST($1, NE, $3);                                  }
 | cond '&' cond                       { $$ = new LogicalOp_ExprAST($1, AND, $3);                                    }
 | cond '|' cond                       { $$ = new LogicalOp_ExprAST($1, OR, $3);                                     }
-;
-
-type:
-  data_type                           { $$ = $1; }
-// | data_type '['']'                    {  }
 ;
 
 %%
