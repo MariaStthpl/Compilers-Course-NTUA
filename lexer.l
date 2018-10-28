@@ -82,6 +82,7 @@ CC ([^'\"\\]|{ES})
 "(*"                    { comm_num++; BEGIN(COMMENT); }
 
 <COMMENT>"(*"           { comm_num++;}
+<COMMENT>\n             { linenumber++; }
 <COMMENT>"*)"           { if (--comm_num == 0) { printf("COMMENT\n"); BEGIN(INITIAL); } }
 <COMMENT>"*"            { /* nothing */ }
 <COMMENT>"("            { /* nothing */ }
