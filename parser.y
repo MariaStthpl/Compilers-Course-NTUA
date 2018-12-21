@@ -53,7 +53,7 @@ FunctionAST *t;
 %nonassoc '<' '>' LE_OP GE_OP EQ_OP NEQ_OP
 %left '+' '-'
 %left '*' '/' '%'
-%left UPLUS UMINUS '!'
+%left UPLUS UMINUS '!' // not sure about prefix
 %nonassoc IF_PART NO_ELSE
 
 %type<f> program
@@ -92,16 +92,16 @@ func_body:
   local_def compound_stmt             { $$ = new FuncBody_AST(*$1, $2); }
 ;
 
+fpar_list:
+  /* nothing */                       { $$ = new std::vector<std::pair<std::string, Type*>>(); }              /*!*/
+| fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
+| fpar_list ',' fpar_def              { $1->push_back(*$3); }
+;
+
 fpar_def:
   T_id ':' type                     { $$ = new std::pair<std::string, Type*>(*$1, $3); }
 // | T_id ':' TREFERENCE type          { $$ = $1; }
   // T_id                                { $$ = $1; }
-;
-
-fpar_list:
-  /* nothing */                       { $$ = new std::vector<std::pair<std::string, Type*>>(); }
-| fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
-| fpar_list ',' fpar_def              { $1->push_back(*$3); }
 ;
 
 // fpar_list:
