@@ -220,8 +220,8 @@ type:
 %%
 
 void yyerror (const char *msg) {
-  fprintf(stderr, "Minibasic error: %s\n", msg);
-  fprintf(stderr, "Aborting, I've had enough with line %d...\n",
+  fprintf(stderr, "Alan error: %s\n", msg);
+  fprintf(stderr, "Do you even know how Alan? Line %d is so wrong \n",
           linenumber);
   exit(1);
 }
