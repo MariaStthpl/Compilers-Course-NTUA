@@ -50,11 +50,10 @@ FunctionAST *t;
 
 %left '|'
 %left '&'
-%left '!'
 %nonassoc '<' '>' LE_OP GE_OP EQ_OP NEQ_OP
 %left '+' '-'
 %left '*' '/' '%'
-%left UPLUS UMINUS
+%left UPLUS UMINUS '!'
 %nonassoc IF_PART NO_ELSE
 
 %type<f> program
