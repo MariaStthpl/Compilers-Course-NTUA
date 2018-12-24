@@ -51,11 +51,10 @@ FunctionAST *t;
 
 %left '|'
 %left '&'
-%left '!'
 %nonassoc '<' '>' LE_OP GE_OP EQ_OP NEQ_OP
 %left '+' '-'
 %left '*' '/' '%'
-%left UPLUS UMINUS
+%left UPLUS UMINUS '!' // not sure about prefix
 %nonassoc IF_PART NO_ELSE
 
 %type<f> program
@@ -217,8 +216,8 @@ cond:
 %%
 
 void yyerror (const char *msg) {
-  fprintf(stderr, "Minibasic error: %s\n", msg);
-  fprintf(stderr, "Aborting, I've had enough with line %d...\n",
+  fprintf(stderr, "Alan error: %s\n", msg);
+  fprintf(stderr, "Do you even know how Alan? Line %d is so wrong \n",
           linenumber);
   exit(1);
 }
