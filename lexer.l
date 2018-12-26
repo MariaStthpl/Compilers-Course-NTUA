@@ -2,7 +2,6 @@
 #include <string.h>
 #include "ast.hpp"
 #include "parser.hpp"
-// #include "general.h"
 #define T_eof 0
 
 int linenumber = 1;
