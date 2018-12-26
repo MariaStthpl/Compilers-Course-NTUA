@@ -220,7 +220,7 @@ type:
 
 void yyerror (const char *msg) {
   fprintf(stderr, "Alan error: %s\n", msg);
-  fprintf(stderr, "Do you even know how Alan? Line %d is so wrong \n",
+  fprintf(stderr, "Do you even know Alan? Line %d is so wrong \n",
           linenumber);
   exit(1);
 }
