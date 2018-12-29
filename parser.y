@@ -35,7 +35,7 @@ FunctionAST *t;
 
   int n;
   char c;
-  std::string *s;
+  std::string s;
 }
 
 %token TINT TBYTE TIF TELSE TTRUE TFALSE TPROC TREFERENCE TRETURN TWHILE
@@ -86,7 +86,7 @@ program:
 
 func_def:
   T_id '(' fpar_list ')'':' r_type 
-  func_body                           { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
+  func_body                           { $$ = new FunctionAST(new PrototypeAST($6, $1, *$3), $7); } 
 ;
 
 func_body:
@@ -94,7 +94,7 @@ func_body:
 ;
 
 fpar_def:
-  T_id ':' type                       { $$ = new std::pair<std::string, Type*>(*$1, $3); }
+  T_id ':' type                       { $$ = new std::pair<std::string, Type*>($1, $3); }
 // | T_id ':' TREFERENCE type          { $$ = $1; }
 ;
 
@@ -118,7 +118,7 @@ local_def:
 ;
 
 var_def:
-  T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>(*$1, $3));  }
+  T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>($1, $3));  }
 ;
 
 var_type:
@@ -161,8 +161,8 @@ stmt:
 ;
 
 l_value:
-  T_id                              { $$ = new Id_ExprAST(*$1); }
-| T_id '[' expr ']'                 { $$ = new ArrayElement_ExprAST(*$1, $3); }
+  T_id                              { $$ = new Id_ExprAST($1); }
+| T_id '[' expr ']'                 { $$ = new ArrayElement_ExprAST($1, $3); }
 // // | T_STRING                            { $$ = $1; }
 ;
 
@@ -172,7 +172,7 @@ l_value:
 // ;
 
 func_call:
-  T_id '(' expr_list ')'            { $$ = new FuncCall(*$1, *$3); }
+  T_id '(' expr_list ')'            { $$ = new FuncCall($1, *$3); }
 ;
 
 expr_list :
