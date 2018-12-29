@@ -30,7 +30,9 @@ public:
   BasicBlock *block;
   Value *returnValue;
   std::map<std::string, AllocaInst *> locals;
+  std::map<std::string, AllocaInst *> inherited;
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
+  std::map<std::string, AllocaInst *> &getInherited() { return inherited; }
   void setId(int n) { id = n; }
   int getId() { return id; }
   Function *getFunction() { return fun; }
@@ -46,6 +48,7 @@ public:
   Module *module;
   CodeGenContext() {}
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
+  std::map<std::string, AllocaInst *> &inherited() { return blocks.top()->inherited; }
   BasicBlock *currentBlock() { return blocks.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
   {
@@ -275,7 +278,7 @@ class FuncCall : public StmtAST, public ExprAST
 
 public:
   FuncCall(const std::string &Callee,
-              std::vector<ExprAST *> Args)
+           std::vector<ExprAST *> Args)
       : Callee(Callee), Args(std::move(Args)) {}
   virtual Value *codegen() override;
 };
@@ -330,7 +333,14 @@ public:
     std::vector<Type *> argTypes;
     std::vector<std::pair<std::string, Type *>>::const_iterator it;
     for (it = Args.begin(); it != Args.end(); it++)
-      argTypes.push_back((*it).second);
+    {
+      // pass array by reference -> dont create pointer to pointer
+      if (PointerType::classof((*it).second) && PointerType::classof(((*it).second)->getPointerElementType()))
+        argTypes.push_back(((*it).second)->getPointerElementType());
+      else
+        argTypes.push_back((*it).second);
+    }
+    // argTypes.push_back(PointerType::getUnqual(Type::getInt16Ty(getGlobalContext())));
     return argTypes;
   };
 };
