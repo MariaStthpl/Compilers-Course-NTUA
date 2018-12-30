@@ -30,9 +30,9 @@ public:
   BasicBlock *block;
   Value *returnValue;
   std::map<std::string, AllocaInst *> locals;
-  std::map<std::string, AllocaInst *> inherited;
+  std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
-  std::map<std::string, AllocaInst *> &getInherited() { return inherited; }
+  std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
   void setId(int n) { id = n; }
   int getId() { return id; }
   Function *getFunction() { return fun; }
@@ -48,7 +48,7 @@ public:
   Module *module;
   CodeGenContext() {}
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
-  std::map<std::string, AllocaInst *> &inherited() { return blocks.top()->inherited; }
+  std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return blocks.top()->inherited; }
   BasicBlock *currentBlock() { return blocks.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
   {
@@ -71,19 +71,6 @@ public:
   void setPrev(CodeGenBlock *CB) { blocks.top()->prev = CB; }
   CodeGenBlock *getPrev(CodeGenBlock *CB) { return CB->prev; }
   Value *getCurrentReturnValue() { return blocks.top()->returnValue; }
-  // CodeGenBlock *getBlockByFunctionName(std::string f) {
-  //   std::cout << "searching " << f << std::endl;
-  //   CodeGenBlock *block = getTop();
-  //   while ( block != nullptr ) {
-  //     if ( block->getFunName().compare(f) ) {
-
-  //       std::cout << "AAAAAAAAAAAA" << block->getId() << std::endl;
-  //       return block;
-  //     }
-  //     else
-  //       block = getPrev(block);
-  //   }
-  // }
 };
 
 extern CodeGenContext context;
@@ -322,9 +309,11 @@ class PrototypeAST
   Type *t;
   std::string Name;
   std::vector<std::pair<std::string, Type *>> Args;
+  // a.insert(std::end(a), std::begin(b), std::end(b));
 
 public:
   PrototypeAST(Type *t, const std::string &name, std::vector<std::pair<std::string, Type *>> Args) : t(t), Name(name), Args(std::move(Args)) {}
+
   Function *codegen();
   const std::string &getName() const { return Name; }
   Type *getType() { return t; }
@@ -340,6 +329,10 @@ public:
       else
         argTypes.push_back((*it).second);
     }
+
+    // for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it) {
+    //     argTypes.push_back((*it).second->getAllocatedType());
+    // }
     // argTypes.push_back(PointerType::getUnqual(Type::getInt16Ty(getGlobalContext())));
     return argTypes;
   };

@@ -162,21 +162,21 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
 // IR for <int-const>
 Value *IntConst_ExprAST::codegen()
 {
-  myfile << "<int-const>: ";
+  // myfile << "<int-const>: ";
   return c16(Val);
 }
 
 // IR for <char-const>
 Value *CharConst_ExprAST::codegen()
 {
-  myfile << "<char-const>: " << Val;
+  // myfile << "<char-const>: " << Val;
   return c8(Val);
 }
 
 // IR for <id>
 Value *Id_ExprAST::codegen()
 {
-  myfile << "<id>: " << Name;
+  // myfile << "<id>: " << Name;
   // Look this variable up in the function.
   CodeGenBlock *block = context.getTop();
   AllocaInst *V;
@@ -209,7 +209,7 @@ Value *Id_ExprAST::codegen()
 // IR for <id>[<expr>]
 Value *ArrayElement_ExprAST::codegen()
 {
-  myfile << "<id>[<expr>]: " << Name << "[" << dyn_cast<ConstantInt>(getExpr())->getSExtValue() << "]" << std::endl;
+  // myfile << "<id>[<expr>]: " << Name << "[" << dyn_cast<ConstantInt>(getExpr())->getSExtValue() << "]" << std::endl;
 
   AllocaInst *arr = context.locals()[Name];
   Value *index = expr->codegen();
@@ -316,7 +316,7 @@ Value *LogicalOp_CondAST::codegen()
 // IR for ⟨l-value⟩ '=' ⟨expr⟩
 Value *Assignment_StmtAST::codegen()
 {
-  myfile << "⟨l-value⟩ '=' ⟨expr⟩: \t";
+  // myfile << "⟨l-value⟩ '=' ⟨expr⟩: \t";
   Value *Val = RHS->codegen();
   if (!Val)
     return nullptr;
@@ -413,13 +413,14 @@ Value *CompoundStmt_StmtAST::codegen()
 // IR for ⟨func-call⟩
 Value *FuncCall::codegen()
 {
+  myfile << "\nCalling function: " << Callee << std::endl;
   // Look up the name in the global module table.
   Function *CalleeF = TheModule->getFunction(Callee);
   if (!CalleeF)
     return LogErrorV("Unknown function referenced");
 
-  // If argument mismatch error.
-  if (CalleeF->arg_size() != Args.size())
+  // If argument mismatch error. Except the real parameters, we take into consideration the # pointers of previous variables' declaration
+  if (CalleeF->arg_size() != (Args.size() + (context.getTop()->inherited[Callee]).size()))
     return LogErrorV("Incorrect # arguments passed");
 
   std::vector<Value *> ArgsV;
@@ -462,9 +463,9 @@ Value *FuncCall::codegen()
             break;
           }
         } while (block != nullptr);
-        // if (!V)
-        //   LogErrorV("Unknown variable name");
-        // return V;
+        if (!V)
+          LogErrorV("Unknown variable name");
+        return V;
       }
     }
     else
@@ -472,7 +473,26 @@ Value *FuncCall::codegen()
     if (!ArgsV.back())
       return nullptr;
   }
-  // ArgsV.push_back(context.getTop()->getLocals()[]);
+
+  for (std::vector<std::pair<std::string, Type *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
+  {
+    if (PointerType::classof((context.locals()[it->first])->getAllocatedType()))
+    {
+      std::vector<Value *> indexList;
+      indexList.push_back(c16(0));
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, context.currentBlock());
+      LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
+      ArgsV.push_back(ldinst);
+    }
+    else
+    {
+      std::vector<Value *> indexList;
+      indexList.push_back(c16(0));
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, context.currentBlock());
+      ArgsV.push_back(gepInst);
+    }
+  }
+
   return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
@@ -582,6 +602,10 @@ Value *Return_Stmt::codegen()
 
 Function *PrototypeAST::codegen()
 {
+  /* pass previous variables as pointers */
+  if (context.id > 0)
+    Args.insert(Args.end(), (context.getTop())->inherited[Name].begin(), (context.getTop())->inherited[Name].end());
+
   std::vector<Type *> argTypes = getArgsTypes();
 
   FunctionType *FT =
@@ -628,6 +652,11 @@ Value *FuncBody_AST::codegen()
     {
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
       Builder.SetInsertPoint(context.currentBlock());
+      /* save var defs so far */
+      for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+      {
+        context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(it->second->getAllocatedType())));
+      }
       temp->codegen();
     }
   }
@@ -669,16 +698,7 @@ Function *FunctionAST::codegen()
   Builder.SetInsertPoint(context.currentBlock());
 
   if (context.id > 1)
-  {
-    context.inherited() = prev->getLocals();
     context.locals() = prev->getLocals();
-
-    //TODO pointer to previous function's variable
-    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
-    {
-      AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, it->first, (it->second)->getAllocatedType());
-    }
-  }
 
   // Record the function arguments in the NamedValues map.
   for (auto &Arg : TheFunction->args())
@@ -693,7 +713,23 @@ Function *FunctionAST::codegen()
 
   if (Value *RetVal = Body->codegen())
   {
-
+    myfile << "\n";
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
+    for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << i->first << std::endl;
+      for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
+      {
+        for (int i = 0; i < context.id; i++)
+          myfile << "\t";
+        myfile << (it->first) << "   " << (it->second) << std::endl;
+      }
+    }
+    myfile << "\n";
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
     myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
@@ -704,19 +740,6 @@ Function *FunctionAST::codegen()
         myfile << "\t";
       myfile << (it->first) << "   " << (it->second) << std::endl;
     }
-    myfile << std::endl;
-
-    for (int i = 0; i < context.id; i++)
-      myfile << "\t";
-    myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
-
-    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getInherited()).begin(); it != (context.getTop()->getInherited()).end(); ++it)
-    {
-      for (int i = 0; i < context.id; i++)
-        myfile << "\t";
-      myfile << (it->first) << "   " << (it->second) << std::endl;
-    }
-    myfile << std::endl;
 
     // Finish off the function.
     Builder.SetInsertPoint(context.currentBlock());
