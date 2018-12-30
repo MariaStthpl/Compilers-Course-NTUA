@@ -5,9 +5,8 @@
 #include "ast.hpp"
 
 using namespace llvm;
-using namespace std;
 
-ofstream myfile;
+std::ofstream myfile;
 
 // Global LLVM variables related to the LLVM suite.
 static LLVMContext TheContext;
@@ -52,8 +51,10 @@ CodeGenContext context;
 
 void llvm_compile_and_dump(FunctionAST *t)
 {
+  myfile.open("ast.txt");
+
   // Initialize the module and the optimization passes.
-  TheModule = make_unique<Module>("minibasic program", TheContext);
+  TheModule = make_unique<Module>("alan program", TheContext);
   TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
   TheFPM->add(createPromoteMemoryToRegisterPass());
   // TODO optimizations
@@ -112,6 +113,7 @@ void llvm_compile_and_dump(FunctionAST *t)
   // TheReadByte =
   //     Function::Create(readByte_type, Function::ExternalLinkage,
   //                      "readInteger", TheModule.get());
+
   // Define and start the main function.
   t->codegen();
 
@@ -160,22 +162,22 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
 // IR for <int-const>
 Value *IntConst_ExprAST::codegen()
 {
-  // std::cout << "Creating integer: " << Val << " in " <<  context.id << std::endl;
+  myfile << "<int-const>: ";
   return c16(Val);
 }
 
 // IR for <char-const>
 Value *CharConst_ExprAST::codegen()
 {
-  // std::cout << "Creating char: " << Val << std::endl;
+  myfile << "<char-const>: " << Val;
   return c8(Val);
 }
 
 // IR for <id>
 Value *Id_ExprAST::codegen()
 {
+  myfile << "<id>: " << Name;
   // Look this variable up in the function.
-
   CodeGenBlock *block = context.getTop();
   AllocaInst *V;
   do
@@ -185,34 +187,52 @@ Value *Id_ExprAST::codegen()
       block = context.getPrev(block);
     else
     {
-      if (ArrayType::classof(V->getAllocatedType()))
+      if (PointerType::classof(V->getAllocatedType()))
       {
-        AllocaInst *arr = context.locals()[Name];
-        Value *index = c16(0);
-        Value *indexList[2] = {ConstantInt::get(index->getType(), 0), index};
-        return GetElementPtrInst::CreateInBounds(V->getAllocatedType(), arr, ArrayRef<Value *>(indexList, 2), Name, context.currentBlock());
+        // id in function -> using pointer
+        std::vector<Value *> indexList;
+        indexList.push_back(c16(0));
+        LoadInst *ldinst = Builder.CreateLoad(V, Name);
+        GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+        return Builder.CreateLoad(gepInst, Name);
       }
-      return Builder.CreateLoad(V, Name.c_str());
+      else
+        return Builder.CreateLoad(V, Name.c_str());
     }
   } while (block != nullptr);
 
   if (!V)
     LogErrorV("Unknown variable name");
+  return V;
 }
 
 // IR for <id>[<expr>]
 Value *ArrayElement_ExprAST::codegen()
 {
+  myfile << "<id>[<expr>]: " << Name << "[" << dyn_cast<ConstantInt>(getExpr())->getSExtValue() << "]" << std::endl;
+
   AllocaInst *arr = context.locals()[Name];
   Value *index = expr->codegen();
-  Value *indexList[2] = {ConstantInt::get(index->getType(), 0), index};
+
   if (PointerType::classof(arr->getAllocatedType()))
   {
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList, 2), Name, context.currentBlock());
+    // array element in function -> using pointer
+    std::vector<Value *> indexList;
+    indexList.push_back(index);
+    LoadInst *ldinst = Builder.CreateLoad(arr, Name);
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
     return Builder.CreateLoad(gepInst, Name);
   }
-  GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList, 2), Name, context.currentBlock());
-  return Builder.CreateLoad(gepInst, Name);
+  else
+  {
+    // array element in main
+    std::vector<Value *> indexList;
+    indexList.push_back(c16(0));
+    indexList.push_back(index);
+    LoadInst *ldinst = Builder.CreateLoad(arr, Name);
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    return Builder.CreateSExtOrBitCast(Builder.CreateLoad(gepInst, Name), i16);
+  }
 }
 
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
@@ -296,6 +316,7 @@ Value *LogicalOp_CondAST::codegen()
 // IR for ⟨l-value⟩ '=' ⟨expr⟩
 Value *Assignment_StmtAST::codegen()
 {
+  myfile << "⟨l-value⟩ '=' ⟨expr⟩: \t";
   Value *Val = RHS->codegen();
   if (!Val)
     return nullptr;
@@ -303,12 +324,13 @@ Value *Assignment_StmtAST::codegen()
   ArrayElement_ExprAST *LHSA = dynamic_cast<ArrayElement_ExprAST *>(LHS);
   if (!LHSA)
   {
+    /* assignment in identifier */
     Id_ExprAST *LHSE = dynamic_cast<Id_ExprAST *>(LHS);
     if (!LHSE)
       return LogErrorV("destination of '=' is not a variable");
 
     CodeGenBlock *block = context.getTop();
-    Value *Variable;
+    AllocaInst *Variable;
     do
     {
       Variable = block->getLocals()[LHSE->getName()];
@@ -320,24 +342,23 @@ Value *Assignment_StmtAST::codegen()
       }
       else
       {
-        // std::map<std::string, AllocaInst *>::iterator it = context.getTop()->getLocals().find(LHSE->getName());
-        // if (it != context.getTop()->getLocals().end() )
-        //   it->second = dynamic_cast<AllocaInst *>(Val);
-        Builder.CreateStore(Val, Variable);
-        // context.getTop()->getLocals().emplace(LHSE->getName(), dynamic_cast<AllocaInst *>(Val));
-
-        // for (std::map<std::string, AllocaInst*>::const_iterator it = (block->getLocals()).begin(); it != (block->getLocals()).end(); ++it ) {
-        //   std::cout << it->first << "   " << (it->second) << std::endl;
-        // }
-
-        // block->getLocals()[LHSE->getName()] = dynamic_cast<AllocaInst *>(Val);
-        // context.locals()[LHSE->getName()] = dynamic_cast<AllocaInst *>(v);
+        if (PointerType::classof(Variable->getAllocatedType()))
+        {
+          Value *index = c16(0);
+          Value *indexList[] = {ConstantInt::get(index->getType(), 0)};
+          LoadInst *ldinst = Builder.CreateLoad(Variable, LHSE->getName());
+          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
+          Builder.CreateStore(Val, gepInst);
+        }
+        else
+          Builder.CreateStore(Val, Variable);
         break;
       }
     } while (block != nullptr);
   }
   else
   {
+    /* assignment in array element */
     CodeGenBlock *block = context.getTop();
     AllocaInst *arr;
     do
@@ -350,10 +371,24 @@ Value *Assignment_StmtAST::codegen()
       }
       else
       {
-        Value *index = LHSA->getExpr();
-        Value *indexList[2] = {ConstantInt::get(index->getType(), 0), index};
-        GetElementPtrInst *gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList, 2), LHSA->getName(), context.currentBlock());
-        Builder.CreateStore(Val, gepInst);
+        Value *t = LHSA->getExpr();
+        Value *index = Builder.CreateSExt(t, i32, "ext");
+        std::vector<Value *> indexList;
+
+        if (PointerType::classof(arr->getAllocatedType()))
+        {
+          indexList.push_back(index);
+          LoadInst *ldinst = Builder.CreateLoad(arr, LHSA->getName());
+          GetElementPtrInst *gepInst = GetElementPtrInst::Create((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), LHSA->getName(), context.currentBlock());
+          Builder.CreateStore(Val, gepInst);
+        }
+        else
+        {
+          indexList.push_back(c16(0));
+          indexList.push_back(index);
+          GetElementPtrInst *gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), LHSA->getName(), context.currentBlock());
+          Builder.CreateStore(Val, gepInst);
+        }
         break;
       }
     } while (block != NULL);
@@ -391,12 +426,53 @@ Value *FuncCall::codegen()
   FunctionType *FTy = CalleeF->getFunctionType();
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
   {
-    ArgsV.push_back(Args[i]->codegen());
-    IRBuilder<> TmpB(&CalleeF->getEntryBlock(),
-                     CalleeF->getEntryBlock().begin());
+    // check argument pass by reference
+    if (PointerType::classof(FTy->getParamType(i)))
+    {
+      if (dynamic_cast<Id_ExprAST *>(Args[i]) != nullptr)
+      {
+        myfile << std::endl
+               << "\t----func call with pointer" << std::endl;
+        Id_ExprAST *temp = dynamic_cast<Id_ExprAST *>(Args[i]);
+
+        CodeGenBlock *block = context.getTop();
+        AllocaInst *V;
+        do
+        {
+          V = block->getLocals()[temp->getName()];
+          if (!V)
+            block = context.getPrev(block);
+          else
+          {
+            if (ArrayType::classof(V->getAllocatedType()))
+            {
+              myfile << "\t\t--func call array" << std::endl;
+              std::vector<Value *> indexList;
+              indexList.push_back(c16(0));
+              indexList.push_back(c16(0));
+              GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock());
+              ArgsV.push_back(gepInst);
+            }
+            else
+            {
+              std::vector<Value *> indexList;
+              indexList.push_back(c16(0));
+              ArgsV.push_back(GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock()));
+            }
+            break;
+          }
+        } while (block != nullptr);
+        // if (!V)
+        //   LogErrorV("Unknown variable name");
+        // return V;
+      }
+    }
+    else
+      ArgsV.push_back(Args[i]->codegen());
     if (!ArgsV.back())
       return nullptr;
   }
+  // ArgsV.push_back(context.getTop()->getLocals()[]);
   return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
@@ -532,9 +608,10 @@ Value *FuncBody_AST::codegen()
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
-  // Register all variables and emit their initializer
+  // <local-def>
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i)
   {
+    // <var-def>
     if (dynamic_cast<VarDef *>(VarNames[i]) != nullptr)
     {
       VarDef *temp = dynamic_cast<VarDef *>(VarNames[i]);
@@ -546,6 +623,7 @@ Value *FuncBody_AST::codegen()
 
       context.locals()[VarName] = Alloca;
     }
+    // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
     {
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
@@ -577,6 +655,10 @@ Function *FunctionAST::codegen()
   if (!TheFunction->empty())
     return (Function *)LogErrorV("Function cannot be redefined.");
 
+  for (int i = 0; i < context.id; i++)
+    myfile << "\t";
+  myfile << "New function: " << Proto->getName() << std::endl;
+
   // Create a new basic block to start insertion into.
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
   CodeGenBlock *prev = nullptr;
@@ -587,7 +669,16 @@ Function *FunctionAST::codegen()
   Builder.SetInsertPoint(context.currentBlock());
 
   if (context.id > 1)
+  {
+    context.inherited() = prev->getLocals();
     context.locals() = prev->getLocals();
+
+    //TODO pointer to previous function's variable
+    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+    {
+      AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, it->first, (it->second)->getAllocatedType());
+    }
+  }
 
   // Record the function arguments in the NamedValues map.
   for (auto &Arg : TheFunction->args())
@@ -602,6 +693,31 @@ Function *FunctionAST::codegen()
 
   if (Value *RetVal = Body->codegen())
   {
+
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
+
+    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << (it->first) << "   " << (it->second) << std::endl;
+    }
+    myfile << std::endl;
+
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
+
+    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getInherited()).begin(); it != (context.getTop()->getInherited()).end(); ++it)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << (it->first) << "   " << (it->second) << std::endl;
+    }
+    myfile << std::endl;
+
     // Finish off the function.
     Builder.SetInsertPoint(context.currentBlock());
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
