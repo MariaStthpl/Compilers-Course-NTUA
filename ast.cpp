@@ -25,13 +25,13 @@ static Function *TheWriteInteger;
 static Function *TheWriteString;
 static Function *TheReadInteger;
 // static Function *TheReadByte;
-static Function *TheReadString;
+// static Function *TheReadString;
 
 // Useful LLVM types.
 static Type *i8 = IntegerType::get(TheContext, 8);
 static Type *i16 = IntegerType::get(TheContext, 16);
 static Type *i32 = IntegerType::get(TheContext, 32);
-static Type *i64 = IntegerType::get(TheContext, 64);
+// static Type *i64 = IntegerType::get(TheContext, 64);
 
 // Useful LLVM helper functions.
 inline ConstantInt *c8(char c)
@@ -229,7 +229,7 @@ Value *ArrayElement_ExprAST::codegen()
     std::vector<Value *> indexList;
     indexList.push_back(c16(0));
     indexList.push_back(index);
-    LoadInst *ldinst = Builder.CreateLoad(arr, Name);
+    Builder.CreateLoad(arr, Name); // needed?
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, context.currentBlock());
     return Builder.CreateSExtOrBitCast(Builder.CreateLoad(gepInst, Name), i16);
   }
@@ -711,7 +711,7 @@ Function *FunctionAST::codegen()
     context.locals()[Arg.getName()] = Alloca;
   }
 
-  if (Value *RetVal = Body->codegen())
+  if (Body->codegen())
   {
     myfile << "\n";
     for (int i = 0; i < context.id; i++)
@@ -784,7 +784,7 @@ Value *WriteByte::codegen()
 Value *ReadInteger::codegen()
 {
   Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
-  Builder.CreateIntCast(r, i16, false, "ext");
+  return Builder.CreateIntCast(r, i16, false, "ext");
 }
 
 Value *ReadByte::codegen()
@@ -792,7 +792,7 @@ Value *ReadByte::codegen()
   return Builder.CreateCall(TheReadInteger, std::vector<Value *>());
 }
 
-Value *Shrink::codegen()
-{
-  // return Builder.CreateZExt(n, i8, "ext");
-}
+// Value *Shrink::codegen()
+// {
+//   // return Builder.CreateZExt(n, i8, "ext");
+// }
