@@ -114,7 +114,7 @@ union YYSTYPE
 
   int n;
   char c;
-  std::string s;
+  std::string *s;
 
 #line 120 "parser.hpp" /* yacc.c:1909  */
 };
