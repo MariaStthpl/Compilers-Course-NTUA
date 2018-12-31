@@ -252,14 +252,22 @@ OLD/////////////////////////////////////////////////////////////////////////////
 -------------------------------------------------------------------------------------------------------
 */
 
+// program:
+//   func_def                            { t = $$ = $1; }
+// ;
+
+// func_def:
+//   T_id '(' fpar_list ')'':' r_type 
+//   func_body                           { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
+// ;
 
 // func_body:
 //   local_def compound_stmt             { $$ = new FuncBody_AST(*$1, $2); }
 // ;
 
 // fpar_def:
-//   T_id ':' type                       { $$ = new std::pair<std::string, Type*>($1, $3); }
-// // | T_id ':' TREFERENCE type          { $$ = $1; }
+//   T_id ':' type                       { $$ = new std::pair<std::string, Type*>(*$1, $3); }
+// | T_id ':' TREFERENCE type            { $$ = new std::pair<std::string, Type*>(*$1, PointerType::getUnqual($4)); }
 // ;
 
 // fpar_list:
@@ -275,14 +283,12 @@ OLD/////////////////////////////////////////////////////////////////////////////
 
 // local_def:
 //   /* nothing */                       { $$ = new std::vector<LocalDef_AST *>(); }
-// | func_def                            { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
-// | var_def                             { $$ = new std::vector<LocalDef_AST *>(); $$->push_back($<ld>1); }
 // | local_def var_def                   { $1->push_back($<ld>2); }
 // | local_def func_def                  { $1->push_back($<ld>2); }
 // ;
 
 // var_def:
-//   T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>($1, $3));  }
+//   T_id ':' var_type ';'               { $$ = new VarDef(std::pair<std::string, Type*>(*$1, $3));  }
 // ;
 
 // var_type:
@@ -306,7 +312,6 @@ OLD/////////////////////////////////////////////////////////////////////////////
 
 // stmt_list:
 //   /* nothing */                       { $$ = new CompoundStmt_StmtAST(); }
-// | stmt                                { $$ = new CompoundStmt_StmtAST(); if ($<stmt>1 != NULL) $$->CompoundStmt_StmtAST::statements.push_back($<stmt>1); }
 // | stmt_list stmt                      { if ($<stmt>2 != NULL) $1->statements.push_back($<stmt>2); }
 // ;
 
@@ -325,8 +330,8 @@ OLD/////////////////////////////////////////////////////////////////////////////
 // ;
 
 // l_value:
-//   T_id                              { $$ = new Id_ExprAST($1); }
-// | T_id '[' expr ']'                 { $$ = new ArrayElement_ExprAST($1, $3); }
+//   T_id                              { $$ = new Id_ExprAST(*$1); }
+// | T_id '[' expr ']'                 { $$ = new ArrayElement_ExprAST(*$1, $3); }
 // // // | T_STRING                            { $$ = $1; }
 // ;
 
@@ -336,7 +341,7 @@ OLD/////////////////////////////////////////////////////////////////////////////
 // // ;
 
 // func_call:
-//   T_id '(' expr_list ')'            { $$ = new FuncCall($1, *$3); }
+//   T_id '(' expr_list ')'            { $$ = new FuncCall(*$1, *$3); }
 // ;
 
 // expr_list :
@@ -376,6 +381,7 @@ OLD/////////////////////////////////////////////////////////////////////////////
 // | cond '&' cond                       { $$ = new LogicalOp_CondAST($1, AND, $3);                                    }
 // | cond '|' cond                       { $$ = new LogicalOp_CondAST($1, OR, $3);                                     }
 // ;
+
 
 %%
 
