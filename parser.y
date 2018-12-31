@@ -259,6 +259,9 @@ OLD/////////////////////////////////////////////////////////////////////////////
 // func_def:
 //   T_id '(' fpar_list ')'':' r_type 
 //   func_body                           { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
+//   | T_id '(' ')'':' r_type 
+//   func_body                           { $$ = new FunctionAST(new PrototypeAST($5, *$1, NULL), $6); } 
+
 // ;
 
 // func_body:
@@ -271,7 +274,6 @@ OLD/////////////////////////////////////////////////////////////////////////////
 // ;
 
 // fpar_list:
-//   /* nothing */                       { $$ = new std::vector<std::pair<std::string, Type*>>(); }
 // | fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
 // | fpar_list ',' fpar_def              { $1->push_back(*$3); }
 // ;
