@@ -235,6 +235,30 @@ Value *ArrayElement_ExprAST::codegen()
   }
 }
 
+// IR for string-literal
+Value *StringLiteral_ExprAST::codegen()
+{
+  AllocaInst *alloca = Builder.CreateAlloca(ArrayType::get(IntegerType::get(TheContext, 8), string_literal.length() - 1), 0, "string");
+  std::vector<Value *> indexList;
+  indexList.push_back(c8(0));
+  size_t i;
+  for (i = 1; i < string_literal.length() - 1; i++)
+  {
+    indexList.push_back(c8(i - 1));
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", context.currentBlock());
+    Builder.CreateStore(c8(string_literal[i]), gepInst);
+    indexList.pop_back();
+  }
+  indexList.push_back(c8(i - 1));
+  GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", context.currentBlock());
+  Builder.CreateStore(c8(0), gepInst);
+  indexList.pop_back();
+
+  indexList.push_back(c8(0));
+  gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str_ptr", context.currentBlock());
+  return gepInst;
+}
+
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
 Value *ArithmeticOp_ExprAST::codegen()
 {
@@ -430,7 +454,12 @@ Value *FuncCall::codegen()
     // check argument pass by reference
     if (PointerType::classof(FTy->getParamType(i)))
     {
-      if (dynamic_cast<Id_ExprAST *>(Args[i]) != nullptr)
+      if (dynamic_cast<StringLiteral_ExprAST *>(Args[i]) != nullptr)
+      {
+        StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(Args[i]);
+        ArgsV.push_back(str->codegen());
+      }
+      else if (dynamic_cast<Id_ExprAST *>(Args[i]) != nullptr)
       {
         myfile << std::endl
                << "\t----func call with pointer" << std::endl;

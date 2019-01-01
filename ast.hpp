@@ -194,6 +194,15 @@ public:
 };
 
 //TODO: string literal
+class StringLiteral_ExprAST : public ExprAST
+{
+  std::string string_literal;
+
+public:
+  StringLiteral_ExprAST(std::string &str_literal) : string_literal(str_literal) {}
+  virtual Value *codegen() override;
+  const std::string &getString() const { return string_literal; }
+};
 
 // ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
 class ArithmeticOp_ExprAST : public ExprAST
