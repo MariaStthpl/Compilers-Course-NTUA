@@ -13,6 +13,9 @@ CFLAGS=-Wall -g
 
 default: minibasic
 
+libs :
+	lib.a
+
 parser.hpp parser.cpp: parser.y
 	bison -dv -o parser.cpp parser.y
 
@@ -21,14 +24,14 @@ lexer.cpp: lexer.l
 
 parser.o: parser.cpp parser.hpp ast.hpp
 
-lexer.o: lexer.cpp parser.hpp ast.hpp symbol.h
+lexer.o: lexer.cpp parser.hpp ast.hpp
 
 ast.o: ast.cpp ast.hpp symbol.h general.h error.h
 
 # %.o: %.cpp
 # 	$(CXX) $(CXXFLAGS) -c $<
 
-minibasic: lexer.o parser.o ast.o general.o error.o symbol.o
+minibasic: lexer.o parser.o ast.o general.o error.o
 	$(CXX) $(CXXFLAGS) -o minibasic $^ $(LDFLAGS) -lfl
 
 clean:

@@ -405,6 +405,24 @@ public:
   virtual Value *codegen() override;
 };
 
+class WriteChar : public StmtAST
+{
+  ExprAST *p;
+
+public:
+  WriteChar(ExprAST *p) : p(std::move(p)) {}
+  virtual Value *codegen() override;
+};
+
+class WriteString : public StmtAST
+{
+  StringLiteral_ExprAST *string_literal;
+
+public:
+  WriteString(StringLiteral_ExprAST *str) : string_literal(std::move(str)) {}
+  virtual Value *codegen() override;
+};
+
 class ReadInteger : public ExprAST
 {
 public:

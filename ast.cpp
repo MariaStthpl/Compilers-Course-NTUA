@@ -21,7 +21,7 @@ static GlobalVariable *TheVars;
 static GlobalVariable *TheNL;
 
 static Function *TheWriteInteger;
-// static Function *TheWriteByte;
+static Function *TheWriteByte;
 static Function *TheWriteString;
 static Function *TheReadInteger;
 // static Function *TheReadByte;
@@ -791,8 +791,8 @@ Function *FunctionAST::codegen()
 Value *WriteInteger::codegen()
 {
   Value *n = p->codegen();
-  // Value *n64 = Builder.CreateZExt(n, i64, "ext");
-  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
+  Value *n16 = Builder.CreateZExt(n, i16, "ext");
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
   Value *idxList[] = {c32(0), c32(0)};
   Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
   Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
@@ -802,12 +802,34 @@ Value *WriteInteger::codegen()
 Value *WriteByte::codegen()
 {
   Value *n = p->codegen();
-  Value *n16 = Builder.CreateZExt(n, i16, "ext");
+  Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
+
+  return c8(0);
+}
+
+Value *WriteChar::codegen()
+{
+  Value *n = p->codegen();
+  Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
   Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
   Value *idxList[] = {c32(0), c32(0)};
   Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
   Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return n;
+}
+
+Value *WriteString::codegen()
+{
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Value *str = string_literal->codegen();
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{str});
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
+  return c16(0);
 }
 
 Value *ReadInteger::codegen()
