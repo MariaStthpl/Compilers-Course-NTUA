@@ -16,6 +16,7 @@ FunctionAST *t;
 // %expect 10 // 1 - if else, 1 - var_def, 6 - stmt_list, 1 - return, 1 - WriteInteger
 %union{
   Id_ExprAST *id;
+  StringLiteral_ExprAST *string_literal;
 
   ExprAST *expr;
   CondAST *cond;
@@ -92,6 +93,8 @@ FunctionAST *t;
 %type<t> type
 %type<t> r_type
 
+%type<string_literal> strlit
+
 %%
 
 
@@ -111,9 +114,7 @@ func_def:
   T_id '(' fpar_list ')'':' r_type 
   func_body                           { $$ = new FunctionAST(new PrototypeAST($6, *$1, *$3), $7); } 
   | T_id '(' ')'':' r_type 
-  func_body                           { $$ = new FunctionAST(new PrototypeAST($5, *$1, std::vector<std::pair<std::string, Type *>>()
-), $6); } 
-
+  func_body                           { $$ = new FunctionAST(new PrototypeAST($5, *$1, std::vector<std::pair<std::string, Type *>>()), $6); } 
 ;
 
 func_body:
@@ -126,7 +127,7 @@ fpar_def:
 ;
 
 fpar_list:
-fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
+  fpar_def                            { $$ = new std::vector<std::pair<std::string, Type*>>(); $$->push_back(*$1); }
 | fpar_list ',' fpar_def              { $1->push_back(*$3); }
 ;
 
@@ -181,18 +182,14 @@ stmt:
 | TRETURN ';'                         { $$ = new Return_Stmt(nullptr); } 
 | TW_INT '(' expr ')' ';'             { $$ = new WriteInteger($3); }
 | TW_BYTE '(' expr ')' ';'            { $$ = new WriteByte($3); }
+| TW_STRING '(' l_value ')' ';'       { $$ = new WriteString($<string_literal>3); }
 ;
 
 l_value:
   T_id                              { $$ = new Id_ExprAST(*$1); }
 | T_id '[' expr ']'                 { $$ = new ArrayElement_ExprAST(*$1, $3); }
-// // | T_STRING                            { $$ = $1; }
+| T_STRING                          { $$ = new StringLiteral_ExprAST(*$1); }
 ;
-
-// ret_value:
-//   /* nothing */                       {  }
-// | expr                                {  }
-// ;
 
 func_call:
   T_id '(' expr_list ')'            { $$ = new FuncCall(*$1, *$3); }
@@ -236,7 +233,6 @@ cond:
 | cond '|' cond                       { $$ = new LogicalOp_CondAST($1, OR, $3);                                     }
 ;
 
-
 %%
 
 void yyerror (const char *msg) {
@@ -251,13 +247,3 @@ int main() {
   llvm_compile_and_dump(t);
   return 0;
 }
-
-// int main() {
-//   if (yyparse()) return 1;
-//   printf("Compilation was successful.\n");
-//   initSymbolTable(997);
-//   ast_sem(t);
-//   ast_run(t);
-//   destroySymbolTable();
-//   return 0;
-// }
