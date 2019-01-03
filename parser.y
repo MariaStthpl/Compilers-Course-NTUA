@@ -213,9 +213,10 @@ expr:
 | expr '%' expr                       { $$ = new ArithmeticOp_ExprAST($1, MOD, $3); }
 | '+' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, $2); }   %prec UPLUS
 | '-' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, $2); }  %prec UMINUS
-| TR_INT '(' ')'                      { $$ = new ReadInteger(); }
-| TR_BYTE '(' ')'                     { $$ = new ReadByte(); }
-
+| "readInteger" '(' ')'               { $$ = new ReadInteger(); }
+| "readByte" '(' ')'                  { $$ = new ReadByte(); }
+| "readChar" '(' ')'                  { $$ = new ReadByte(); }
+| "readString" '(' ')'                { $$ = new ReadString(); }
 ;
 
 cond:

@@ -24,8 +24,8 @@ static Function *TheWriteInteger;
 static Function *TheWriteByte;
 static Function *TheWriteString;
 static Function *TheReadInteger;
-// static Function *TheReadByte;
-// static Function *TheReadString;
+static Function *TheReadChar;
+static Function *TheReadString;
 
 // Useful LLVM types.
 static Type *i8 = IntegerType::get(TheContext, 8);
@@ -102,24 +102,26 @@ void llvm_compile_and_dump(FunctionAST *t)
                        "writeString", TheModule.get());
 
   FunctionType *readInteger_type =
-      FunctionType::get(Type::getInt8Ty(TheContext),
+      FunctionType::get(Type::getInt16Ty(TheContext),
                         std::vector<Type *>(), false);
   TheReadInteger =
       Function::Create(readInteger_type, Function::ExternalLinkage,
                        "readInteger", TheModule.get());
-  // FunctionType *readByte_type =
-  //   FunctionType::get(Type::getInt8Ty(TheContext),
-  //                       std::vector<Type *>(), false);
-  // TheReadByte =
-  //     Function::Create(readByte_type, Function::ExternalLinkage,
-  //                      "readInteger", TheModule.get());
+
+  FunctionType *readChar_type =
+      FunctionType::get(Type::getInt8Ty(TheContext),
+                        std::vector<Type *>(), false);
+  TheReadChar =
+      Function::Create(readChar_type, Function::ExternalLinkage,
+                       "readChar", TheModule.get());
 
   // Define and start the main function.
   t->codegen();
-  if ( t->Proto->getName() != "main" ) {
+  if (t->Proto->getName() != "main")
+  {
     auto fun = TheModule->getFunction("main");
     auto main_function = TheModule->getFunction(t->Proto->getName());
-    if ( fun != NULL )
+    if (fun != NULL)
       fun->setName("_oldmain");
     main_function->setName("main");
   }
@@ -824,15 +826,17 @@ Function *FunctionAST::codegen()
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
     context.popBlock();
 
-
-
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
     return TheFunction;
-  } else {
+  }
+  else
+  {
     Builder.SetInsertPoint(context.currentBlock());
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
     context.popBlock();
+    verifyFunction(*TheFunction);
+    return TheFunction;
   }
 
   // Error reading body, remove function.
@@ -920,12 +924,27 @@ Value *WriteString::codegen()
 Value *ReadInteger::codegen()
 {
   Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
-  return Builder.CreateIntCast(r, i16, false, "ext");
+  if (!(r->getType()->isIntegerTy(16)))
+    LogErrorV("Wrong type of input. ReadInteger expects Integer type");
+  return r;
 }
 
 Value *ReadByte::codegen()
 {
-  return Builder.CreateCall(TheReadInteger, std::vector<Value *>());
+  Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
+  if (!(r->getType()->isIntegerTy(8)))
+    LogErrorV("Wrong type of input. ReadByte expects byte type");
+  return r;
+}
+
+Value *ReadChar::codegen()
+{
+  // Value *r = Builder.CreateCall(TheReadChar, std::vector<Value *>());
+  // if ()
+}
+
+Value *ReadString::codegen()
+{
 }
 
 // Value *Shrink::codegen()

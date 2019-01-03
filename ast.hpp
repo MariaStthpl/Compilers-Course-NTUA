@@ -438,6 +438,20 @@ public:
   virtual Value *codegen() override;
 };
 
+class ReadChar : public ExprAST
+{
+public:
+  ReadChar() {}
+  virtual Value *codegen() override;
+};
+
+class ReadString : public ExprAST
+{
+public:
+  ReadString() {}
+  virtual Value *codegen() override;
+};
+
 class Extend : public ExprAST
 {
   ExprAST *expr;
