@@ -116,6 +116,13 @@ void llvm_compile_and_dump(FunctionAST *t)
 
   // Define and start the main function.
   t->codegen();
+  if ( t->Proto->getName() != "main" ) {
+    auto fun = TheModule->getFunction("main");
+    auto main_function = TheModule->getFunction(t->Proto->getName());
+    if ( fun != NULL )
+      fun->setName("_oldmain");
+    main_function->setName("main");
+  }
 
   // Verify and optimize the main function.
   bool bad = verifyModule(*TheModule, &errs());
@@ -194,10 +201,21 @@ Value *Id_ExprAST::codegen()
         indexList.push_back(c16(0));
         LoadInst *ldinst = Builder.CreateLoad(V, Name);
         GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-        return Builder.CreateLoad(gepInst, Name);
+        // return Builder.CreateLoad(gepInst, Name);
+        return gepInst;
+      }
+      else if (ArrayType::classof(V->getAllocatedType()))
+      {
+        std::vector<Value *> indexList;
+        indexList.push_back(c8(0));
+        indexList.push_back(c8(0));
+        GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+        return gepInst;
       }
       else
+      {
         return Builder.CreateLoad(V, Name.c_str());
+      }
     }
   } while (block != nullptr);
 
@@ -375,7 +393,7 @@ Value *Assignment_StmtAST::codegen()
           Value *index = c16(0);
           Value *indexList[] = {ConstantInt::get(index->getType(), 0)};
           LoadInst *ldinst = Builder.CreateLoad(Variable, LHSE->getName());
-          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
+          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(Variable->getAllocatedType()->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
           Builder.CreateStore(Val, gepInst);
         }
         else if (ArrayType::classof(Variable->getAllocatedType()))
@@ -384,17 +402,23 @@ Value *Assignment_StmtAST::codegen()
           if (str)
           {
             /* check if out of bounds */
-            if (str->getString().length() < Variable->getAllocatedType()->getArrayNumElements())
+            if ((str->getString().length() - 3) < Variable->getAllocatedType()->getArrayNumElements())
             {
               // in bounds
               size_t i;
               for (i = 1; i < str->getString().length() - 1; i++)
               {
-                Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i)), new CharConst_ExprAST(str->getString()[i]));
+                Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i - 1)), new CharConst_ExprAST(str->getString()[i]));
                 assignelement->codegen();
               }
-              Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i)), new CharConst_ExprAST('\0'));
+              Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i - 1)), new CharConst_ExprAST('\0'));
               assignelement->codegen();
+            }
+            else
+            {
+              // out of bounds
+              LogErrorV("Array out of bounds");
+              return c16(1);
             }
           }
         }
@@ -520,7 +544,6 @@ Value *FuncCall::codegen()
         } while (block != nullptr);
         if (!V)
           LogErrorV("Unknown variable name");
-        return V;
       }
     }
     else
@@ -801,9 +824,15 @@ Function *FunctionAST::codegen()
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
     context.popBlock();
 
+
+
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
     return TheFunction;
+  } else {
+    Builder.SetInsertPoint(context.currentBlock());
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
+    context.popBlock();
   }
 
   // Error reading body, remove function.
@@ -873,82 +902,19 @@ Value *WriteChar::codegen()
 
 Value *WriteString::codegen()
 {
-  Id_ExprAST *idexpr = dynamic_cast<Id_ExprAST *>(str);
-  if (idexpr)
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Value *n = str->codegen();
+  if (n->getType()->isPointerTy() && n->getType()->getPointerElementType()->isIntegerTy(8))
   {
-    CodeGenBlock *block = context.getTop();
-    AllocaInst *V;
-    do
-    {
-      V = block->getLocals()[idexpr->getName()];
-      if (!V)
-        block = context.getPrev(block);
-      else
-      {
-        if (PointerType::classof(V->getAllocatedType()))
-        {
-          // id in function -> using pointer
-          Type *temp = (V->getAllocatedType());
-          if (temp->getPointerElementType()->getIntegerBitWidth() == 8)
-          {
-            // Value *n = p->codegen();
-            // Value *n8 = Builder.CreateZExtOrTrunc(n, i8, "ext");
-            // Builder.CreateCall(TheWriteByte, std::vector<Value *>{n8});
-            // Value *idxList[] = {c32(0), c32(0)};
-            // Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Value *st = str->codegen();
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{st});
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getPointerElementType()->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        else
-        {
-          Type *temp = (V->getAllocatedType());
-          if (temp->getIntegerBitWidth() == 8)
-          {
-            // Value *n = p->codegen();
-            // Value *n8 = Builder.CreateZExtOrTrunc(n, i8, "ext");
-            // Builder.CreateCall(TheWriteByte, std::vector<Value *>{n8});
-            // Value *idxList[] = {c32(0), c32(0)};
-            // Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Value *st = str->codegen();
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{st});
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        break;
-      }
-
-    } while (block != nullptr);
-
-    if (!V)
-      LogErrorV("Unknown variable name");
+    Builder.CreateCall(TheWriteString, std::vector<Value *>{n});
+    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   }
   else
   {
-    Value *idxList[] = {c32(0), c32(0)};
-    Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-    Value *st = str->codegen();
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{st});
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
+    LogErrorV("Parameter is wrong type (String expected)");
   }
-  return c16(0);
+  return c8(0);
 }
 
 Value *ReadInteger::codegen()

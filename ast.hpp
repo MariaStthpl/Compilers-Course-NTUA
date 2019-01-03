@@ -28,7 +28,7 @@ public:
   Function *fun;
   CodeGenBlock *prev;
   BasicBlock *block;
-  Value *returnValue;
+  Value *returnValue = nullptr ;
   std::map<std::string, AllocaInst *> locals;
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
