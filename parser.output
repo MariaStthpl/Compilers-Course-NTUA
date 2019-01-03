@@ -1,7 +1,5 @@
 Terminals unused in grammar
 
-   TR_CHAR
-   TR_STRING
    T_EXNTEND
    T_SHRINK
    T_STRLEN
@@ -9,11 +7,13 @@ Terminals unused in grammar
    T_STRCPY
    T_STRCAT
    "print"
+   "readChar"
+   "readString"
    IF_PART
    NO_ELSE
 
 
-State 151 conflicts: 1 shift/reduce
+State 146 conflicts: 1 shift/reduce
 
 
 Grammar
@@ -65,11 +65,11 @@ Grammar
    30     | "while" '(' cond ')' stmt
    31     | "return" expr ';'
    32     | "return" ';'
-   33     | TW_INT '(' expr ')' ';'
-   34     | TW_BYTE '(' expr ')' ';'
-   35     | TW_CHAR '(' expr ')' ';'
-   36     | TW_STRING '(' T_STRING ')' ';'
-   37     | TW_STRING '(' T_id ')' ';'
+   33     | "writeInteger" '(' expr ')' ';'
+   34     | "writeByte" '(' expr ')' ';'
+   35     | "writeChar" '(' expr ')' ';'
+   36     | "writeString" '(' T_STRING ')' ';'
+   37     | "writeString" '(' T_id ')' ';'
 
    38 l_value: T_id
    39        | T_id '[' expr ']'
@@ -93,8 +93,8 @@ Grammar
    54     | expr '%' expr
    55     | '+' expr
    56     | '-' expr
-   57     | TR_INT '(' ')'
-   58     | TR_BYTE '(' ')'
+   57     | "readInteger" '(' ')'
+   58     | "readByte" '(' ')'
 
    59 cond: "true"
    60     | "false"
@@ -137,32 +137,32 @@ error (256)
 TINT (258) 17
 TBYTE (259) 18
 TREFERENCE (260) 6
-TW_INT (261) 33
-TW_BYTE (262) 34
-TW_CHAR (263) 35
-TW_STRING (264) 36 37
-TR_INT (265) 57
-TR_BYTE (266) 58
-TR_CHAR (267)
-TR_STRING (268)
-T_EXNTEND (269)
-T_SHRINK (270)
-T_STRLEN (271)
-T_STRCMP (272)
-T_STRCPY (273)
-T_STRCAT (274)
-"if" (275) 28 29
-"else" (276) 29
-"while" (277) 30
-"return" (278) 31 32
-"proc" (279) 20
-"print" (280)
-"true" (281) 59
-"false" (282) 60
-"==" (283) 67
-"!=" (284) 68
-"<=" (285) 65
-">=" (286) 66
+T_EXNTEND (261)
+T_SHRINK (262)
+T_STRLEN (263)
+T_STRCMP (264)
+T_STRCPY (265)
+T_STRCAT (266)
+"if" (267) 28 29
+"else" (268) 29
+"while" (269) 30
+"return" (270) 31 32
+"proc" (271) 20
+"print" (272)
+"true" (273) 59
+"false" (274) 60
+"==" (275) 67
+"!=" (276) 68
+"<=" (277) 65
+">=" (278) 66
+"writeInteger" (279) 33
+"writeByte" (280) 34
+"writeChar" (281) 35
+"writeString" (282) 36 37
+"readInteger" (283) 57
+"readByte" (284) 58
+"readChar" (285)
+"readString" (286)
 T_id (287) 2 3 5 6 14 37 38 39 41
 T_INT_CONST (288) 16 45
 T_CHAR_CONST (289) 46
@@ -543,18 +543,18 @@ State 37
    21 compound_stmt: '{' stmt_list . '}'
    23 stmt_list: stmt_list . stmt
 
-    TW_INT     shift, and go to state 40
-    TW_BYTE    shift, and go to state 41
-    TW_CHAR    shift, and go to state 42
-    TW_STRING  shift, and go to state 43
-    "if"       shift, and go to state 44
-    "while"    shift, and go to state 45
-    "return"   shift, and go to state 46
-    T_id       shift, and go to state 47
-    T_STRING   shift, and go to state 48
-    ';'        shift, and go to state 49
-    '{'        shift, and go to state 31
-    '}'        shift, and go to state 50
+    "if"            shift, and go to state 40
+    "while"         shift, and go to state 41
+    "return"        shift, and go to state 42
+    "writeInteger"  shift, and go to state 43
+    "writeByte"     shift, and go to state 44
+    "writeChar"     shift, and go to state 45
+    "writeString"   shift, and go to state 46
+    T_id            shift, and go to state 47
+    T_STRING        shift, and go to state 48
+    ';'             shift, and go to state 49
+    '{'             shift, and go to state 31
+    '}'             shift, and go to state 50
 
     compound_stmt  go to state 51
     stmt           go to state 52
@@ -581,67 +581,67 @@ State 39
 
 State 40
 
-   33 stmt: TW_INT . '(' expr ')' ';'
+   28 stmt: "if" . '(' cond ')' stmt
+   29     | "if" . '(' cond ')' stmt "else" stmt
 
     '('  shift, and go to state 57
 
 
 State 41
 
-   34 stmt: TW_BYTE . '(' expr ')' ';'
+   30 stmt: "while" . '(' cond ')' stmt
 
     '('  shift, and go to state 58
 
 
 State 42
 
-   35 stmt: TW_CHAR . '(' expr ')' ';'
+   31 stmt: "return" . expr ';'
+   32     | "return" . ';'
 
-    '('  shift, and go to state 59
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+    ';'            shift, and go to state 66
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 69
 
 
 State 43
 
-   36 stmt: TW_STRING . '(' T_STRING ')' ';'
-   37     | TW_STRING . '(' T_id ')' ';'
+   33 stmt: "writeInteger" . '(' expr ')' ';'
 
-    '('  shift, and go to state 60
+    '('  shift, and go to state 70
 
 
 State 44
 
-   28 stmt: "if" . '(' cond ')' stmt
-   29     | "if" . '(' cond ')' stmt "else" stmt
+   34 stmt: "writeByte" . '(' expr ')' ';'
 
-    '('  shift, and go to state 61
+    '('  shift, and go to state 71
 
 
 State 45
 
-   30 stmt: "while" . '(' cond ')' stmt
+   35 stmt: "writeChar" . '(' expr ')' ';'
 
-    '('  shift, and go to state 62
+    '('  shift, and go to state 72
 
 
 State 46
 
-   31 stmt: "return" . expr ';'
-   32     | "return" . ';'
+   36 stmt: "writeString" . '(' T_STRING ')' ';'
+   37     | "writeString" . '(' T_id ')' ';'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-    ';'           shift, and go to state 70
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 73
+    '('  shift, and go to state 73
 
 
 State 47
@@ -721,224 +721,158 @@ State 56
 
 State 57
 
-   33 stmt: TW_INT '(' . expr ')' ';'
+   28 stmt: "if" '(' . cond ')' stmt
+   29     | "if" '(' . cond ')' stmt "else" stmt
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 79
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 83
+    cond       go to state 84
 
 
 State 58
 
-   34 stmt: TW_BYTE '(' . expr ')' ';'
+   30 stmt: "while" '(' . cond ')' stmt
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 80
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 83
+    cond       go to state 85
 
 
 State 59
 
-   35 stmt: TW_CHAR '(' . expr ')' ';'
+   57 expr: "readInteger" . '(' ')'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 81
+    '('  shift, and go to state 86
 
 
 State 60
 
-   36 stmt: TW_STRING '(' . T_STRING ')' ';'
-   37     | TW_STRING '(' . T_id ')' ';'
+   58 expr: "readByte" . '(' ')'
 
-    T_id      shift, and go to state 82
-    T_STRING  shift, and go to state 83
+    '('  shift, and go to state 87
 
 
 State 61
-
-   28 stmt: "if" '(' . cond ')' stmt
-   29     | "if" '(' . cond ')' stmt "else" stmt
-
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 88
-    cond       go to state 89
-
-
-State 62
-
-   30 stmt: "while" '(' . cond ')' stmt
-
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 88
-    cond       go to state 90
-
-
-State 63
-
-   57 expr: TR_INT . '(' ')'
-
-    '('  shift, and go to state 91
-
-
-State 64
-
-   58 expr: TR_BYTE . '(' ')'
-
-    '('  shift, and go to state 92
-
-
-State 65
 
    45 expr: T_INT_CONST .
 
     $default  reduce using rule 45 (expr)
 
 
-State 66
+State 62
 
    46 expr: T_CHAR_CONST .
 
     $default  reduce using rule 46 (expr)
 
 
-State 67
+State 63
 
    55 expr: '+' . expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 93
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 88
 
 
-State 68
+State 64
 
    56 expr: '-' . expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 94
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 89
 
 
-State 69
+State 65
 
    48 expr: '(' . expr ')'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 95
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 90
 
 
-State 70
+State 66
 
    32 stmt: "return" ';' .
 
     $default  reduce using rule 32 (stmt)
 
 
-State 71
+State 67
 
    47 expr: l_value .
 
     $default  reduce using rule 47 (expr)
 
 
-State 72
+State 68
 
    49 expr: func_call .
 
     $default  reduce using rule 49 (expr)
 
 
-State 73
+State 69
 
    31 stmt: "return" expr . ';'
    50 expr: expr . '+' expr
@@ -947,32 +881,98 @@ State 73
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-    ';'  shift, and go to state 101
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+    ';'  shift, and go to state 96
+
+
+State 70
+
+   33 stmt: "writeInteger" '(' . expr ')' ';'
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 97
+
+
+State 71
+
+   34 stmt: "writeByte" '(' . expr ')' ';'
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 98
+
+
+State 72
+
+   35 stmt: "writeChar" '(' . expr ')' ';'
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 99
+
+
+State 73
+
+   36 stmt: "writeString" '(' . T_STRING ')' ';'
+   37     | "writeString" '(' . T_id ')' ';'
+
+    T_id      shift, and go to state 100
+    T_STRING  shift, and go to state 101
 
 
 State 74
 
    41 func_call: T_id '(' . expr_list ')'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
     $default  reduce using rule 42 (expr_list)
 
-    l_value    go to state 71
-    func_call  go to state 72
+    l_value    go to state 67
+    func_call  go to state 68
     expr_list  go to state 102
     expr       go to state 103
 
@@ -981,18 +981,18 @@ State 75
 
    39 l_value: T_id '[' . expr ']'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
+    l_value    go to state 67
+    func_call  go to state 68
     expr       go to state 104
 
 
@@ -1000,18 +1000,18 @@ State 76
 
    25 stmt: l_value '=' . expr ';'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
+    l_value    go to state 67
+    func_call  go to state 68
     expr       go to state 105
 
 
@@ -1031,131 +1031,66 @@ State 78
 
 State 79
 
-   33 stmt: TW_INT '(' expr . ')' ';'
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-    ')'  shift, and go to state 107
-
-
-State 80
-
-   34 stmt: TW_BYTE '(' expr . ')' ';'
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-    ')'  shift, and go to state 108
-
-
-State 81
-
-   35 stmt: TW_CHAR '(' expr . ')' ';'
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-    ')'  shift, and go to state 109
-
-
-State 82
-
-   37 stmt: TW_STRING '(' T_id . ')' ';'
-
-    ')'  shift, and go to state 110
-
-
-State 83
-
-   36 stmt: TW_STRING '(' T_STRING . ')' ';'
-
-    ')'  shift, and go to state 111
-
-
-State 84
-
    59 cond: "true" .
 
     $default  reduce using rule 59 (cond)
 
 
-State 85
+State 80
 
    60 cond: "false" .
 
     $default  reduce using rule 60 (cond)
 
 
-State 86
+State 81
 
    62 cond: '!' . cond
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 88
-    cond       go to state 112
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 83
+    cond       go to state 107
 
 
-State 87
+State 82
 
    48 expr: '(' . expr ')'
    61 cond: '(' . cond ')'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 113
-    cond       go to state 114
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 108
+    cond       go to state 109
 
 
-State 88
+State 83
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1169,57 +1104,57 @@ State 88
    67     | expr . "==" expr
    68     | expr . "!=" expr
 
-    "=="  shift, and go to state 115
-    "!="  shift, and go to state 116
-    "<="  shift, and go to state 117
-    ">="  shift, and go to state 118
-    '<'   shift, and go to state 119
-    '>'   shift, and go to state 120
-    '+'   shift, and go to state 96
-    '-'   shift, and go to state 97
-    '*'   shift, and go to state 98
-    '/'   shift, and go to state 99
-    '%'   shift, and go to state 100
+    "=="  shift, and go to state 110
+    "!="  shift, and go to state 111
+    "<="  shift, and go to state 112
+    ">="  shift, and go to state 113
+    '<'   shift, and go to state 114
+    '>'   shift, and go to state 115
+    '+'   shift, and go to state 91
+    '-'   shift, and go to state 92
+    '*'   shift, and go to state 93
+    '/'   shift, and go to state 94
+    '%'   shift, and go to state 95
 
 
-State 89
+State 84
 
    28 stmt: "if" '(' cond . ')' stmt
    29     | "if" '(' cond . ')' stmt "else" stmt
    69 cond: cond . '&' cond
    70     | cond . '|' cond
 
-    '|'  shift, and go to state 121
-    '&'  shift, and go to state 122
-    ')'  shift, and go to state 123
+    '|'  shift, and go to state 116
+    '&'  shift, and go to state 117
+    ')'  shift, and go to state 118
 
 
-State 90
+State 85
 
    30 stmt: "while" '(' cond . ')' stmt
    69 cond: cond . '&' cond
    70     | cond . '|' cond
 
-    '|'  shift, and go to state 121
-    '&'  shift, and go to state 122
-    ')'  shift, and go to state 124
+    '|'  shift, and go to state 116
+    '&'  shift, and go to state 117
+    ')'  shift, and go to state 119
 
 
-State 91
+State 86
 
-   57 expr: TR_INT '(' . ')'
+   57 expr: "readInteger" '(' . ')'
 
-    ')'  shift, and go to state 125
-
-
-State 92
-
-   58 expr: TR_BYTE '(' . ')'
-
-    ')'  shift, and go to state 126
+    ')'  shift, and go to state 120
 
 
-State 93
+State 87
+
+   58 expr: "readByte" '(' . ')'
+
+    ')'  shift, and go to state 121
+
+
+State 88
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1231,7 +1166,7 @@ State 93
     $default  reduce using rule 55 (expr)
 
 
-State 94
+State 89
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1243,7 +1178,7 @@ State 94
     $default  reduce using rule 56 (expr)
 
 
-State 95
+State 90
 
    48 expr: '(' expr . ')'
    50     | expr . '+' expr
@@ -1252,114 +1187,179 @@ State 95
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-    ')'  shift, and go to state 127
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+    ')'  shift, and go to state 122
+
+
+State 91
+
+   50 expr: expr '+' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 123
+
+
+State 92
+
+   51 expr: expr '-' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 124
+
+
+State 93
+
+   52 expr: expr '*' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 125
+
+
+State 94
+
+   53 expr: expr '/' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 126
+
+
+State 95
+
+   54 expr: expr '%' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 127
 
 
 State 96
 
-   50 expr: expr '+' . expr
+   31 stmt: "return" expr ';' .
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 128
+    $default  reduce using rule 31 (stmt)
 
 
 State 97
 
-   51 expr: expr '-' . expr
+   33 stmt: "writeInteger" '(' expr . ')' ';'
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 129
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+    ')'  shift, and go to state 128
 
 
 State 98
 
-   52 expr: expr '*' . expr
+   34 stmt: "writeByte" '(' expr . ')' ';'
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 130
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+    ')'  shift, and go to state 129
 
 
 State 99
 
-   53 expr: expr '/' . expr
+   35 stmt: "writeChar" '(' expr . ')' ';'
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 131
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+    ')'  shift, and go to state 130
 
 
 State 100
 
-   54 expr: expr '%' . expr
+   37 stmt: "writeString" '(' T_id . ')' ';'
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 132
+    ')'  shift, and go to state 131
 
 
 State 101
 
-   31 stmt: "return" expr ';' .
+   36 stmt: "writeString" '(' T_STRING . ')' ';'
 
-    $default  reduce using rule 31 (stmt)
+    ')'  shift, and go to state 132
 
 
 State 102
@@ -1380,11 +1380,11 @@ State 103
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
 
     $default  reduce using rule 43 (expr_list)
 
@@ -1398,11 +1398,11 @@ State 104
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
     ']'  shift, and go to state 135
 
 
@@ -1415,11 +1415,11 @@ State 105
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
     ';'  shift, and go to state 136
 
 
@@ -1432,41 +1432,6 @@ State 106
 
 State 107
 
-   33 stmt: TW_INT '(' expr ')' . ';'
-
-    ';'  shift, and go to state 137
-
-
-State 108
-
-   34 stmt: TW_BYTE '(' expr ')' . ';'
-
-    ';'  shift, and go to state 138
-
-
-State 109
-
-   35 stmt: TW_CHAR '(' expr ')' . ';'
-
-    ';'  shift, and go to state 139
-
-
-State 110
-
-   37 stmt: TW_STRING '(' T_id ')' . ';'
-
-    ';'  shift, and go to state 140
-
-
-State 111
-
-   36 stmt: TW_STRING '(' T_STRING ')' . ';'
-
-    ';'  shift, and go to state 141
-
-
-State 112
-
    62 cond: '!' cond .
    69     | cond . '&' cond
    70     | cond . '|' cond
@@ -1474,7 +1439,7 @@ State 112
     $default  reduce using rule 62 (cond)
 
 
-State 113
+State 108
 
    48 expr: '(' expr . ')'
    50     | expr . '+' expr
@@ -1489,258 +1454,258 @@ State 113
    67     | expr . "==" expr
    68     | expr . "!=" expr
 
-    "=="  shift, and go to state 115
-    "!="  shift, and go to state 116
-    "<="  shift, and go to state 117
-    ">="  shift, and go to state 118
-    '<'   shift, and go to state 119
-    '>'   shift, and go to state 120
-    '+'   shift, and go to state 96
-    '-'   shift, and go to state 97
-    '*'   shift, and go to state 98
-    '/'   shift, and go to state 99
-    '%'   shift, and go to state 100
-    ')'   shift, and go to state 127
+    "=="  shift, and go to state 110
+    "!="  shift, and go to state 111
+    "<="  shift, and go to state 112
+    ">="  shift, and go to state 113
+    '<'   shift, and go to state 114
+    '>'   shift, and go to state 115
+    '+'   shift, and go to state 91
+    '-'   shift, and go to state 92
+    '*'   shift, and go to state 93
+    '/'   shift, and go to state 94
+    '%'   shift, and go to state 95
+    ')'   shift, and go to state 122
 
 
-State 114
+State 109
 
    61 cond: '(' cond . ')'
    69     | cond . '&' cond
    70     | cond . '|' cond
 
-    '|'  shift, and go to state 121
-    '&'  shift, and go to state 122
-    ')'  shift, and go to state 142
+    '|'  shift, and go to state 116
+    '&'  shift, and go to state 117
+    ')'  shift, and go to state 137
+
+
+State 110
+
+   67 cond: expr "==" . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 138
+
+
+State 111
+
+   68 cond: expr "!=" . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 139
+
+
+State 112
+
+   65 cond: expr "<=" . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 140
+
+
+State 113
+
+   66 cond: expr ">=" . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 141
+
+
+State 114
+
+   63 cond: expr '<' . expr
+
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
+
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 142
 
 
 State 115
 
-   67 cond: expr "==" . expr
+   64 cond: expr '>' . expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
+    l_value    go to state 67
+    func_call  go to state 68
     expr       go to state 143
 
 
 State 116
 
-   68 cond: expr "!=" . expr
+   70 cond: cond '|' . cond
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 144
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 83
+    cond       go to state 144
 
 
 State 117
 
-   65 cond: expr "<=" . expr
+   69 cond: cond '&' . cond
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "true"         shift, and go to state 79
+    "false"        shift, and go to state 80
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '!'            shift, and go to state 81
+    '('            shift, and go to state 82
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 145
+    l_value    go to state 67
+    func_call  go to state 68
+    expr       go to state 83
+    cond       go to state 145
 
 
 State 118
 
-   66 cond: expr ">=" . expr
+   28 stmt: "if" '(' cond ')' . stmt
+   29     | "if" '(' cond ')' . stmt "else" stmt
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "if"            shift, and go to state 40
+    "while"         shift, and go to state 41
+    "return"        shift, and go to state 42
+    "writeInteger"  shift, and go to state 43
+    "writeByte"     shift, and go to state 44
+    "writeChar"     shift, and go to state 45
+    "writeString"   shift, and go to state 46
+    T_id            shift, and go to state 47
+    T_STRING        shift, and go to state 48
+    ';'             shift, and go to state 49
+    '{'             shift, and go to state 31
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 146
+    compound_stmt  go to state 51
+    stmt           go to state 146
+    l_value        go to state 53
+    func_call      go to state 54
 
 
 State 119
 
-   63 cond: expr '<' . expr
+   30 stmt: "while" '(' cond ')' . stmt
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "if"            shift, and go to state 40
+    "while"         shift, and go to state 41
+    "return"        shift, and go to state 42
+    "writeInteger"  shift, and go to state 43
+    "writeByte"     shift, and go to state 44
+    "writeChar"     shift, and go to state 45
+    "writeString"   shift, and go to state 46
+    T_id            shift, and go to state 47
+    T_STRING        shift, and go to state 48
+    ';'             shift, and go to state 49
+    '{'             shift, and go to state 31
 
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 147
+    compound_stmt  go to state 51
+    stmt           go to state 147
+    l_value        go to state 53
+    func_call      go to state 54
 
 
 State 120
 
-   64 cond: expr '>' . expr
-
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 148
-
-
-State 121
-
-   70 cond: cond '|' . cond
-
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 88
-    cond       go to state 149
-
-
-State 122
-
-   69 cond: cond '&' . cond
-
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    "true"        shift, and go to state 84
-    "false"       shift, and go to state 85
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '!'           shift, and go to state 86
-    '('           shift, and go to state 87
-
-    l_value    go to state 71
-    func_call  go to state 72
-    expr       go to state 88
-    cond       go to state 150
-
-
-State 123
-
-   28 stmt: "if" '(' cond ')' . stmt
-   29     | "if" '(' cond ')' . stmt "else" stmt
-
-    TW_INT     shift, and go to state 40
-    TW_BYTE    shift, and go to state 41
-    TW_CHAR    shift, and go to state 42
-    TW_STRING  shift, and go to state 43
-    "if"       shift, and go to state 44
-    "while"    shift, and go to state 45
-    "return"   shift, and go to state 46
-    T_id       shift, and go to state 47
-    T_STRING   shift, and go to state 48
-    ';'        shift, and go to state 49
-    '{'        shift, and go to state 31
-
-    compound_stmt  go to state 51
-    stmt           go to state 151
-    l_value        go to state 53
-    func_call      go to state 54
-
-
-State 124
-
-   30 stmt: "while" '(' cond ')' . stmt
-
-    TW_INT     shift, and go to state 40
-    TW_BYTE    shift, and go to state 41
-    TW_CHAR    shift, and go to state 42
-    TW_STRING  shift, and go to state 43
-    "if"       shift, and go to state 44
-    "while"    shift, and go to state 45
-    "return"   shift, and go to state 46
-    T_id       shift, and go to state 47
-    T_STRING   shift, and go to state 48
-    ';'        shift, and go to state 49
-    '{'        shift, and go to state 31
-
-    compound_stmt  go to state 51
-    stmt           go to state 152
-    l_value        go to state 53
-    func_call      go to state 54
-
-
-State 125
-
-   57 expr: TR_INT '(' ')' .
+   57 expr: "readInteger" '(' ')' .
 
     $default  reduce using rule 57 (expr)
 
 
-State 126
+State 121
 
-   58 expr: TR_BYTE '(' ')' .
+   58 expr: "readByte" '(' ')' .
 
     $default  reduce using rule 58 (expr)
 
 
-State 127
+State 122
 
    48 expr: '(' expr ')' .
 
     $default  reduce using rule 48 (expr)
 
 
-State 128
+State 123
 
    50 expr: expr . '+' expr
    50     | expr '+' expr .
@@ -1749,14 +1714,14 @@ State 128
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
 
     $default  reduce using rule 50 (expr)
 
 
-State 129
+State 124
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1765,14 +1730,14 @@ State 129
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
 
     $default  reduce using rule 51 (expr)
 
 
-State 130
+State 125
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1784,7 +1749,7 @@ State 130
     $default  reduce using rule 52 (expr)
 
 
-State 131
+State 126
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1796,7 +1761,7 @@ State 131
     $default  reduce using rule 53 (expr)
 
 
-State 132
+State 127
 
    50 expr: expr . '+' expr
    51     | expr . '-' expr
@@ -1806,6 +1771,41 @@ State 132
    54     | expr '%' expr .
 
     $default  reduce using rule 54 (expr)
+
+
+State 128
+
+   33 stmt: "writeInteger" '(' expr ')' . ';'
+
+    ';'  shift, and go to state 148
+
+
+State 129
+
+   34 stmt: "writeByte" '(' expr ')' . ';'
+
+    ';'  shift, and go to state 149
+
+
+State 130
+
+   35 stmt: "writeChar" '(' expr ')' . ';'
+
+    ';'  shift, and go to state 150
+
+
+State 131
+
+   37 stmt: "writeString" '(' T_id ')' . ';'
+
+    ';'  shift, and go to state 151
+
+
+State 132
+
+   36 stmt: "writeString" '(' T_STRING ')' . ';'
+
+    ';'  shift, and go to state 152
 
 
 State 133
@@ -1819,18 +1819,18 @@ State 134
 
    44 expr_list: expr_list ',' . expr
 
-    TR_INT        shift, and go to state 63
-    TR_BYTE       shift, and go to state 64
-    T_id          shift, and go to state 47
-    T_INT_CONST   shift, and go to state 65
-    T_CHAR_CONST  shift, and go to state 66
-    T_STRING      shift, and go to state 48
-    '+'           shift, and go to state 67
-    '-'           shift, and go to state 68
-    '('           shift, and go to state 69
+    "readInteger"  shift, and go to state 59
+    "readByte"     shift, and go to state 60
+    T_id           shift, and go to state 47
+    T_INT_CONST    shift, and go to state 61
+    T_CHAR_CONST   shift, and go to state 62
+    T_STRING       shift, and go to state 48
+    '+'            shift, and go to state 63
+    '-'            shift, and go to state 64
+    '('            shift, and go to state 65
 
-    l_value    go to state 71
-    func_call  go to state 72
+    l_value    go to state 67
+    func_call  go to state 68
     expr       go to state 153
 
 
@@ -1850,44 +1850,99 @@ State 136
 
 State 137
 
-   33 stmt: TW_INT '(' expr ')' ';' .
+   61 cond: '(' cond ')' .
 
-    $default  reduce using rule 33 (stmt)
+    $default  reduce using rule 61 (cond)
 
 
 State 138
 
-   34 stmt: TW_BYTE '(' expr ')' ';' .
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
+   67 cond: expr "==" expr .
 
-    $default  reduce using rule 34 (stmt)
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+
+    $default  reduce using rule 67 (cond)
 
 
 State 139
 
-   35 stmt: TW_CHAR '(' expr ')' ';' .
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
+   68 cond: expr "!=" expr .
 
-    $default  reduce using rule 35 (stmt)
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+
+    $default  reduce using rule 68 (cond)
 
 
 State 140
 
-   37 stmt: TW_STRING '(' T_id ')' ';' .
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
+   65 cond: expr "<=" expr .
 
-    $default  reduce using rule 37 (stmt)
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+
+    $default  reduce using rule 65 (cond)
 
 
 State 141
 
-   36 stmt: TW_STRING '(' T_STRING ')' ';' .
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
+   66 cond: expr ">=" expr .
 
-    $default  reduce using rule 36 (stmt)
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+
+    $default  reduce using rule 66 (cond)
 
 
 State 142
 
-   61 cond: '(' cond ')' .
+   50 expr: expr . '+' expr
+   51     | expr . '-' expr
+   52     | expr . '*' expr
+   53     | expr . '/' expr
+   54     | expr . '%' expr
+   63 cond: expr '<' expr .
 
-    $default  reduce using rule 61 (cond)
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
+
+    $default  reduce using rule 63 (cond)
 
 
 State 143
@@ -1897,119 +1952,29 @@ State 143
    52     | expr . '*' expr
    53     | expr . '/' expr
    54     | expr . '%' expr
-   67 cond: expr "==" expr .
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-
-    $default  reduce using rule 67 (cond)
-
-
-State 144
-
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-   68 cond: expr "!=" expr .
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-
-    $default  reduce using rule 68 (cond)
-
-
-State 145
-
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-   65 cond: expr "<=" expr .
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-
-    $default  reduce using rule 65 (cond)
-
-
-State 146
-
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-   66 cond: expr ">=" expr .
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-
-    $default  reduce using rule 66 (cond)
-
-
-State 147
-
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
-   63 cond: expr '<' expr .
-
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
-
-    $default  reduce using rule 63 (cond)
-
-
-State 148
-
-   50 expr: expr . '+' expr
-   51     | expr . '-' expr
-   52     | expr . '*' expr
-   53     | expr . '/' expr
-   54     | expr . '%' expr
    64 cond: expr '>' expr .
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
 
     $default  reduce using rule 64 (cond)
 
 
-State 149
+State 144
 
    69 cond: cond . '&' cond
    70     | cond . '|' cond
    70     | cond '|' cond .
 
-    '&'  shift, and go to state 122
+    '&'  shift, and go to state 117
 
     $default  reduce using rule 70 (cond)
 
 
-State 150
+State 145
 
    69 cond: cond . '&' cond
    69     | cond '&' cond .
@@ -2018,7 +1983,7 @@ State 150
     $default  reduce using rule 69 (cond)
 
 
-State 151
+State 146
 
    28 stmt: "if" '(' cond ')' stmt .
    29     | "if" '(' cond ')' stmt . "else" stmt
@@ -2029,11 +1994,46 @@ State 151
     $default  reduce using rule 28 (stmt)
 
 
-State 152
+State 147
 
    30 stmt: "while" '(' cond ')' stmt .
 
     $default  reduce using rule 30 (stmt)
+
+
+State 148
+
+   33 stmt: "writeInteger" '(' expr ')' ';' .
+
+    $default  reduce using rule 33 (stmt)
+
+
+State 149
+
+   34 stmt: "writeByte" '(' expr ')' ';' .
+
+    $default  reduce using rule 34 (stmt)
+
+
+State 150
+
+   35 stmt: "writeChar" '(' expr ')' ';' .
+
+    $default  reduce using rule 35 (stmt)
+
+
+State 151
+
+   37 stmt: "writeString" '(' T_id ')' ';' .
+
+    $default  reduce using rule 37 (stmt)
+
+
+State 152
+
+   36 stmt: "writeString" '(' T_STRING ')' ';' .
+
+    $default  reduce using rule 36 (stmt)
 
 
 State 153
@@ -2045,11 +2045,11 @@ State 153
    53     | expr . '/' expr
    54     | expr . '%' expr
 
-    '+'  shift, and go to state 96
-    '-'  shift, and go to state 97
-    '*'  shift, and go to state 98
-    '/'  shift, and go to state 99
-    '%'  shift, and go to state 100
+    '+'  shift, and go to state 91
+    '-'  shift, and go to state 92
+    '*'  shift, and go to state 93
+    '/'  shift, and go to state 94
+    '%'  shift, and go to state 95
 
     $default  reduce using rule 44 (expr_list)
 
@@ -2058,17 +2058,17 @@ State 154
 
    29 stmt: "if" '(' cond ')' stmt "else" . stmt
 
-    TW_INT     shift, and go to state 40
-    TW_BYTE    shift, and go to state 41
-    TW_CHAR    shift, and go to state 42
-    TW_STRING  shift, and go to state 43
-    "if"       shift, and go to state 44
-    "while"    shift, and go to state 45
-    "return"   shift, and go to state 46
-    T_id       shift, and go to state 47
-    T_STRING   shift, and go to state 48
-    ';'        shift, and go to state 49
-    '{'        shift, and go to state 31
+    "if"            shift, and go to state 40
+    "while"         shift, and go to state 41
+    "return"        shift, and go to state 42
+    "writeInteger"  shift, and go to state 43
+    "writeByte"     shift, and go to state 44
+    "writeChar"     shift, and go to state 45
+    "writeString"   shift, and go to state 46
+    T_id            shift, and go to state 47
+    T_STRING        shift, and go to state 48
+    ';'             shift, and go to state 49
+    '{'             shift, and go to state 31
 
     compound_stmt  go to state 51
     stmt           go to state 155

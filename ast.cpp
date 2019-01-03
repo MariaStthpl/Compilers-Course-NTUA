@@ -233,7 +233,7 @@ Value *ArrayElement_ExprAST::codegen()
     indexList.push_back(index);
     Builder.CreateLoad(arr, Name); // needed?
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-    return Builder.CreateSExtOrBitCast(Builder.CreateLoad(gepInst, Name), i16);
+    return Builder.CreateLoad(gepInst, Name);
     // Builder.CreateSExtOrBitCast(Builder.CreateLoad(gepInst, Name), i16);
     // return arr;
   }
@@ -378,8 +378,30 @@ Value *Assignment_StmtAST::codegen()
           GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
           Builder.CreateStore(Val, gepInst);
         }
+        else if (ArrayType::classof(Variable->getAllocatedType()))
+        {
+          StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(RHS);
+          if (str)
+          {
+            /* check if out of bounds */
+            if (str->getString().length() < Variable->getAllocatedType()->getArrayNumElements())
+            {
+              // in bounds
+              size_t i;
+              for (i = 1; i < str->getString().length() - 1; i++)
+              {
+                Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i)), new CharConst_ExprAST(str->getString()[i]));
+                assignelement->codegen();
+              }
+              Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i)), new CharConst_ExprAST('\0'));
+              assignelement->codegen();
+            }
+          }
+        }
         else
+        {
           Builder.CreateStore(Val, Variable);
+        }
         break;
       }
     } while (block != nullptr);
@@ -794,152 +816,58 @@ Function *FunctionAST::codegen()
 
 Value *WriteInteger::codegen()
 {
+
   Value *n = p->codegen();
-  Value *n16 = Builder.CreateZExt(n, i16, "ext");
-  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
-  Value *idxList[] = {c32(0), c32(0)};
-  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  return n;
+
+  if (n->getType()->isIntegerTy(16))
+  {
+    Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
+    Value *idxList[] = {c32(0), c32(0)};
+    Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
+  }
+  else
+  {
+    LogErrorV("Variable is wrong type(Integer expected)");
+  }
+  return c8(0);
 }
 
 Value *WriteByte::codegen()
 {
-  Id_ExprAST *idexpr = dynamic_cast<Id_ExprAST *>(p);
-  if (idexpr)
-  {
-    CodeGenBlock *block = context.getTop();
-    AllocaInst *V;
-    do
-    {
-      V = block->getLocals()[idexpr->getName()];
-      if (!V)
-        block = context.getPrev(block);
-      else
-      {
-        if (PointerType::classof(V->getAllocatedType()))
-        {
-          // id in function -> using pointer
-          Type *temp = (V->getAllocatedType());
-          if (temp->getPointerElementType()->getIntegerBitWidth() == 8)
-          {
-            // myfile << "it is 8 bits" << std::endl;
-            Value *n = p->codegen();
-            Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
-            Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getPointerElementType()->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        else
-        {
-          Type *temp = (V->getAllocatedType());
-          if (temp->getIntegerBitWidth() == 8)
-          {
-            Value *n = p->codegen();
-            Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
-            Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        break;
-      }
+  Value *n = p->codegen();
 
-    } while (block != nullptr);
-
-    if (!V)
-      LogErrorV("Unknown variable name");
-  }
-  else
+  if (n->getType()->isIntegerTy(8))
   {
-    Value *n = p->codegen();
     Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
     Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
     Value *idxList[] = {c32(0), c32(0)};
     Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
     Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   }
-
+  else
+  {
+    LogErrorV("Variable is wrong type(Byte expected)");
+  }
   return c8(0);
 }
 
 Value *WriteChar::codegen()
 {
-  Id_ExprAST *idexpr = dynamic_cast<Id_ExprAST *>(p);
-  if (idexpr)
-  {
-    CodeGenBlock *block = context.getTop();
-    AllocaInst *V;
-    do
-    {
-      V = block->getLocals()[idexpr->getName()];
-      if (!V)
-        block = context.getPrev(block);
-      else
-      {
-        if (PointerType::classof(V->getAllocatedType()))
-        {
-          // id in function -> using pointer
-          Type *temp = (V->getAllocatedType());
-          if (temp->getPointerElementType()->getIntegerBitWidth() == 8)
-          {
-            Value *n = p->codegen();
-            Value *n8 = Builder.CreateZExtOrTrunc(n, i8, "ext");
-            Builder.CreateCall(TheWriteByte, std::vector<Value *>{n8});
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getPointerElementType()->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        else
-        {
-          Type *temp = (V->getAllocatedType());
-          if (temp->getIntegerBitWidth() == 8)
-          {
-            Value *n = p->codegen();
-            Value *n8 = Builder.CreateZExtOrTrunc(n, i8, "ext");
-            Builder.CreateCall(TheWriteByte, std::vector<Value *>{n8});
-            Value *idxList[] = {c32(0), c32(0)};
-            Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-            Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-          }
-          else if (temp->getIntegerBitWidth() == 16)
-          {
-            LogErrorV("Variable is wrong type(Integer instead of Byte)");
-          }
-        }
-        break;
-      }
+  Value *n = p->codegen();
 
-    } while (block != nullptr);
-
-    if (!V)
-      LogErrorV("Unknown variable name");
-  }
-  else
+  if (n->getType()->isIntegerTy(8)) //
   {
-    Value *n = p->codegen();
-    Value *n8 = Builder.CreateZExtOrTrunc(n, i8, "ext");
-    Builder.CreateCall(TheWriteByte, std::vector<Value *>{n8});
+    Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
     Value *idxList[] = {c32(0), c32(0)};
     Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
     Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   }
+  else
+  {
+    LogErrorV("Variable is wrong type(Byte expected)");
+  }
+
   return c8(0);
 }
 

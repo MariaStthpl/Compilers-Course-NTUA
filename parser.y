@@ -42,7 +42,7 @@ FunctionAST *t;
 }
 
 %token TINT TBYTE TREFERENCE
-%token  TW_BYTE TW_CHAR TW_STRING TR_INT TR_BYTE TR_CHAR TR_STRING T_EXNTEND T_SHRINK T_STRLEN T_STRCMP T_STRCPY T_STRCAT
+%token T_EXNTEND T_SHRINK T_STRLEN T_STRCMP T_STRCPY T_STRCAT
 
 %token TIF "if"
 %token TELSE "else"
@@ -56,7 +56,14 @@ FunctionAST *t;
 %token NEQ_OP "!="
 %token LE_OP "<="
 %token GE_OP ">="
-%token TW_INT "writeChar"
+%token TW_INT "writeInteger"
+%token TW_BYTE "writeByte"
+%token TW_CHAR "writeChar"
+%token TW_STRING "writeString"
+%token TR_INT "readInteger"
+%token TR_BYTE "readByte"
+%token TR_CHAR "readChar"
+%token TR_STRING "readString"
 %token<s> T_id
 %token<n> T_INT_CONST
 %token<c> T_CHAR_CONST
@@ -166,16 +173,15 @@ stmt:
 | l_value '=' expr ';'                { $$ = new Assignment_StmtAST($1, $3); }
 | compound_stmt                       { $$ = $1; }
 | func_call ';'                       { $$ = $1; }
-| "if" '(' cond ')' stmt               { $$ = new If_StmtAST($3, $5, NULL);  }
-| "if" '(' cond ')' stmt "else" stmt    { $$ = new If_StmtAST($3, $5, $7);  }
-| "while" '(' cond ')' stmt            { $$ = new While_StmtAST($3, $5); }
-| "return" expr ';'                    { $$ = new Return_Stmt($2); }
-| "return" ';'                         { $$ = new Return_Stmt(nullptr); } 
-| TW_INT '(' expr ')' ';'             { $$ = new WriteInteger($3); }
-| TW_BYTE '(' expr ')' ';'            { $$ = new WriteByte($3); }
-| TW_CHAR '(' expr ')' ';'            { $$ = new WriteChar($3); }
-| TW_STRING '(' T_STRING ')' ';'      { $$ = new WriteString(new StringLiteral_ExprAST(*$3)); }
-| TW_STRING '(' T_id ')' ';'          { $$ = new WriteString(new Id_ExprAST(*$3)); }
+| "if" '(' cond ')' stmt              { $$ = new If_StmtAST($3, $5, NULL);  }
+| "if" '(' cond ')' stmt "else" stmt  { $$ = new If_StmtAST($3, $5, $7);  }
+| "while" '(' cond ')' stmt           { $$ = new While_StmtAST($3, $5); }
+| "return" expr ';'                   { $$ = new Return_Stmt($2); }
+| "return" ';'                        { $$ = new Return_Stmt(nullptr); } 
+| "writeInteger" '(' expr ')' ';'     { $$ = new WriteInteger($3); }
+| "writeByte" '(' expr ')' ';'        { $$ = new WriteByte($3); }
+| "writeChar" '(' expr ')' ';'        { $$ = new WriteChar($3); }
+| "writeString" '(' expr ')' ';'      { $$ = new WriteString($3); }
 ;
 
 l_value:

@@ -9,30 +9,23 @@ main:                                   # @main
 	subq	$24, %rsp
 .Ltmp0:
 	.cfi_def_cfa_offset 32
-	movb	$97, 23(%rsp)
-	movb	$98, 22(%rsp)
-	movabsq	$2324210631224608321, %rax # imm = 0x2041414141544641
-	movq	%rax, 4(%rsp)
-	movabsq	$9369253208541509, %rax # imm = 0x214949414E4945
-	movq	%rax, 12(%rsp)
-	leaq	4(%rsp), %rdi
-	callq	writeString
-	movl	$.Lnl, %edi
-	callq	writeString
-	movl	$2, %edi
+	movb	$114, 7(%rsp)
+	movb	$101, 8(%rsp)
+	movzbl	8(%rsp), %edi
 	callq	writeInteger
-	movl	$.Lnl, %edi
-	callq	writeString
-	movw	$2, 20(%rsp)
-	movzbl	22(%rsp), %edi
-	callq	writeChar
 	movl	$.Lnl, %edi
 	callq	writeString
 	movl	$97, %edi
 	callq	writeInteger
 	movl	$.Lnl, %edi
 	callq	writeString
-	movl	$65535, %edi            # imm = 0xFFFF
+	movzbl	7(%rsp), %edi
+	callq	writeInteger
+	movl	$.Lnl, %edi
+	callq	writeString
+	movl	$1, %edi
+	callq	hehe
+	movzbl	%al, %edi
 	callq	writeInteger
 	movl	$.Lnl, %edi
 	callq	writeString
@@ -40,6 +33,19 @@ main:                                   # @main
 	retq
 .Lfunc_end0:
 	.size	main, .Lfunc_end0-main
+	.cfi_endproc
+
+	.globl	hehe
+	.align	16, 0x90
+	.type	hehe,@function
+hehe:                                   # @hehe
+	.cfi_startproc
+# BB#0:                                 # %entry
+	movw	%di, -2(%rsp)
+	movb	$104, %al
+	retq
+.Lfunc_end1:
+	.size	hehe, .Lfunc_end1-hehe
 	.cfi_endproc
 
 	.type	.Lvars,@object          # @vars

@@ -1,0 +1,5 @@
+digraph "CFG for 'hehe' function" {
+	label="CFG for 'hehe' function";
+
+	Node0x1e0e9d0 [shape=record,label="{entry:\l  %l1 = alloca i16\l  store i16 %l, i16* %l1\l  ret i8 104\l}"];
+}

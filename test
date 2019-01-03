@@ -1,15 +1,20 @@
 main() : proc
+    hehe(l: int): byte
+    {
+        return 'h';
+    }
     x : int;
     y: byte;
-    g: byte;
+    g: byte[10];
+    a: int[3];
     {
-        g = 'a';
-        y = 'b';
-        writeString("AFTAAAA EINAII!");
-        writeInteger(2);
-        x = 2;
-        writeChar(y);
+        y = 'r';
+        g[0] = 'e';
+        writeByte(g[0]);
         writeByte('a');
-        writeInteger(-1);
+        writeByte(y);
+        writeByte(hehe(1));
+
+
         return;
     }

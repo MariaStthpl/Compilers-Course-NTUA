@@ -399,8 +399,6 @@ public:
 class WriteByte : public StmtAST
 {
   ExprAST *p;
-  int flagId;
-  // char p;
 
 public:
   WriteByte(ExprAST *p) : p(std::move(p)) {}
