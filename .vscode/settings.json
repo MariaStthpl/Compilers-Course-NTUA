@@ -47,6 +47,10 @@
         "deque": "cpp",
         "iomanip": "cpp",
         "memory": "cpp",
-        "numeric": "cpp"
+        "numeric": "cpp",
+        "bitset": "cpp",
+        "list": "cpp",
+        "mutex": "cpp",
+        "algorithm": "cpp"
     }
 }

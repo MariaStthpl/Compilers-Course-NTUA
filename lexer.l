@@ -62,7 +62,7 @@ CC ([^'\"\\]|{ES})
 "=="				    { return EQ_OP; }
 "!="				    { return NEQ_OP; }
 
-'{CC}'                  { return T_CHAR_CONST; }
+'{CC}'                  { yylval.c = yytext[1]; return T_CHAR_CONST; }
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = yytext; return T_NAME; return T_STRING; } */
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; return T_STRING; } */
 

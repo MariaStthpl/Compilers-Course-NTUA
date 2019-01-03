@@ -1,0 +1,30 @@
+rm: cannot remove 'a.out': No such file or directory
+rm: cannot remove 'a.s': No such file or directory
+lexer.cpp: In function ‘int yy_get_next_buffer()’:
+lexer.cpp:1382:44: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+  if ((int) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+                                            ^
+lexer.cpp: At global scope:
+lexer.cpp:1458:17: warning: ‘void yyunput(int, char*)’ defined but not used [-Wunused-function]
+     static void yyunput (int c, char * yy_bp )
+                 ^
+Function context does not match Module context!
+void ()* @main
+Stored value type does not match pointer operand type!
+  store i8 97, i8* %g
+ i8Stored value type does not match pointer operand type!
+  store i8 98, i8* %y
+ i8Stored value type does not match pointer operand type!
+  store i16 2, i16* %x
+ i16Call parameter type does not match function signature!
+  %y16 = load i8, i8* %y
+ i8  call void @writeChar(i8 %y16)
+The faulty IR is:
+------------------------------------------------
+
+WARNING: You're attempting to print out a bitcode file.
+This is inadvisable as it may cause display problems. If
+you REALLY want to taste LLVM bitcode first-hand, you
+can force output with the `-f' option.
+
+Writing 'cfg.main.dot'...

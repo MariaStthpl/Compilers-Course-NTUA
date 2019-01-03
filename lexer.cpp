@@ -1038,7 +1038,7 @@ case 34:
 /* rule 34 can match eol */
 YY_RULE_SETUP
 #line 65 "lexer.l"
-{ return T_CHAR_CONST; }
+{ yylval.c = yytext[1]; return T_CHAR_CONST; }
 	YY_BREAK
 /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = yytext; return T_NAME; return T_STRING; } */
 /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; return T_STRING; } */

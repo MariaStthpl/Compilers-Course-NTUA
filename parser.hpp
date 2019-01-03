@@ -93,6 +93,7 @@ union YYSTYPE
 #line 17 "parser.y" /* yacc.c:1909  */
 
   Id_ExprAST *id;
+  StringLiteral_ExprAST *string_literal;
 
   ExprAST *expr;
   CondAST *cond;
@@ -116,7 +117,7 @@ union YYSTYPE
   char c;
   std::string *s;
 
-#line 120 "parser.hpp" /* yacc.c:1909  */
+#line 121 "parser.hpp" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

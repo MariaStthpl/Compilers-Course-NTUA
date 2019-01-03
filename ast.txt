@@ -1,0 +1,8 @@
+New function: main
+
+	Inherited: 0
+
+	Locals: 3
+	g   0xc699f8
+	x   0xc691e8
+	y   0xc69918

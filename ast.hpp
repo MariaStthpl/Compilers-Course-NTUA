@@ -153,17 +153,17 @@ class IntConst_ExprAST : public ExprAST
   int Val;
 
 public:
-  IntConst_ExprAST(double Val) : Val(Val){};
+  IntConst_ExprAST(int Val) : Val(Val){};
   virtual Value *codegen() override;
 };
 
 // <char-const>
 class CharConst_ExprAST : public ExprAST
 {
-  int Val;
+  char Val;
 
 public:
-  CharConst_ExprAST(double Val) : Val(Val){};
+  CharConst_ExprAST(char Val) : Val(Val){};
   virtual Value *codegen() override;
 };
 
@@ -399,6 +399,8 @@ public:
 class WriteByte : public StmtAST
 {
   ExprAST *p;
+  int flagId;
+  // char p;
 
 public:
   WriteByte(ExprAST *p) : p(std::move(p)) {}
@@ -408,6 +410,7 @@ public:
 class WriteChar : public StmtAST
 {
   ExprAST *p;
+  // char p;
 
 public:
   WriteChar(ExprAST *p) : p(std::move(p)) {}
@@ -416,10 +419,10 @@ public:
 
 class WriteString : public StmtAST
 {
-  StringLiteral_ExprAST *string_literal;
+  ExprAST *str;
 
 public:
-  WriteString(StringLiteral_ExprAST *str) : string_literal(std::move(str)) {}
+  WriteString(ExprAST *str) : str(std::move(str)) {}
   virtual Value *codegen() override;
 };
 
