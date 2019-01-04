@@ -8,6 +8,19 @@ int linenumber = 1;
 int comm_num = 0;
 
 void yyerror (const char *msg);
+
+// char* fixEscapeChars (char* stringToFix) {
+//     for(int i=0; stringToFix[i]!='\0'; i++ ) {
+//         if( (stringToFix[i]==('\\')) && (stringToFix[i+1]==(('n')||('t')) ) ) {
+//             stringToFix[i] = '\n';
+//             for(int j=i+1; stringToFix[j]!='\0'; j++) {
+//                 stringToFix[j] = stringToFix[j+1];
+//             }
+//         }
+//     }
+//     return stringToFix;
+// }
+
 %}
 
 L [a-zA-Z]

@@ -1,18 +1,19 @@
-rm: cannot remove 'a.out': No such file or directory
-rm: cannot remove 'a.s': No such file or directory
-Error: Unknown variable name
-Basic Block in function 'main' does not have terminator!
-label %entry
-Basic Block in function 'is_it' does not have terminator!
-label %entry
+lexer.cpp: In function ‘int yy_get_next_buffer()’:
+lexer.cpp:1395:44: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+  if ((int) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+                                            ^
+lexer.cpp: At global scope:
+lexer.cpp:1471:17: warning: ‘void yyunput(int, char*)’ defined but not used [-Wunused-function]
+     static void yyunput (int c, char * yy_bp )
+                 ^
+Function context does not match Module context!
+void ()* @main
 The faulty IR is:
 ------------------------------------------------
 
-llc: a.ll:32:1: error: expected instruction opcode
-}
-^
-clang: error: no such file or directory: 'a.s'
-opt: a.ll:32:1: error: expected instruction opcode
-}
-^
-do.sh: 13: do.sh: ./a.out: not found
+WARNING: You're attempting to print out a bitcode file.
+This is inadvisable as it may cause display problems. If
+you REALLY want to taste LLVM bitcode first-hand, you
+can force output with the `-f' option.
+
+Writing 'cfg.main.dot'...

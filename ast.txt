@@ -1,16 +1,5 @@
-New function: cancer
-	New function: is_it
+New function: main
 
-					Inherited: 0
+	Inherited: 0
 
-					Locals: 1
-					i   0
-
-Calling function: is_it
-
-	----func call with pointer
-		--func call array
-
-							Inherited: 0
-
-							Locals: 0
+	Locals: 0
