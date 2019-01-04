@@ -5,43 +5,67 @@
 
 declare void @writeInteger(i16)
 
+declare i8 @ord(i8)
+
 declare void @writeChar(i8)
 
 declare void @writeString(i8*)
 
-declare i8 @readInteger()
+declare i16 @readInteger()
+
+declare i8 @readChar()
+
+declare void @readString(i16, i8*)
+
+declare i16 @strlen(i8*)
+
+declare i16 @strcmp(i8*, i8*)
+
+declare void @strcpy(i8*, i8*)
+
+declare void @strcat(i8*, i8*)
 
 define void @main() {
 entry:
-  %a = alloca [3 x i16]
-  %g = alloca [10 x i8]
-  %y = alloca i8
-  %x = alloca i16
-  store i8 114, i8* %y
-  %g1 = getelementptr [10 x i8], [10 x i8]* %g, i16 0, i32 0
-  store i8 101, i8* %g1
-  %g2 = load [10 x i8], [10 x i8]* %g
-  %g3 = getelementptr inbounds [10 x i8], [10 x i8]* %g, i16 0, i16 0
-  %g4 = load i8, i8* %g3
-  %ext = zext i8 %g4 to i16
-  call void @writeInteger(i16 %ext)
-  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))
-  call void @writeInteger(i16 97)
-  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))
-  %y5 = load i8, i8* %y
-  %ext6 = zext i8 %y5 to i16
-  call void @writeInteger(i16 %ext6)
-  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))
-  %calltmp = call i8 @hehe(i16 1)
-  %ext7 = zext i8 %calltmp to i16
-  call void @writeInteger(i16 %ext7)
-  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))
+  %i = alloca i16
+  %a = alloca [10 x i16]
+  store i16 0, i16* %i
+  %i1 = load i16, i16* %i
+  %ltmp = icmp slt i16 %i1, i16 10
+  %while_entry = icmp ne i1 %ltmp, i32 0
+  br i1 %while_entry, label %while, label %while_end
+  %a5 = getelementptr [10 x i16], [10 x i16]* %a, i16 0, i32 %ext
+  %a12 = getelementptr inbounds [10 x i16], [10 x i16]* %a, i16 0, i16 6
+  %str = getelementptr inbounds [3 x i8], [3 x i8]* %string, i8 0, i8 0
+  %str14 = getelementptr inbounds [3 x i8], [3 x i8]* %string, i8 0, i8 1
+  %str15 = getelementptr inbounds [3 x i8], [3 x i8]* %string, i8 0, i8 2
+  %str_ptr = getelementptr inbounds [3 x i8], [3 x i8]* %string, i8 0, i8 0
   ret void
-}
 
-define i8 @hehe(i16 %l) {
-entry:
-  %l1 = alloca i16
-  store i16 %l, i16* %l1
-  ret i8 104
-}
+while:                                            ; preds = %while, %entry
+  %i2 = load i16, i16* %i
+  %i3 = load i16, i16* %i
+  %addtmp = add i16 %i3, i16 1
+  %multmp = mul i16 %i2, %addtmp
+  %i4 = load i16, i16* %i
+  %ext = sext i16 %i4 to i32
+  store i16 %multmp, i16* %a5
+  %i6 = load i16, i16* %i
+  %addtmp7 = add i16 %i6, i16 1
+  store i16 %addtmp7, i16* %i
+  %i8 = load i16, i16* %i
+  %ltmp9 = icmp slt i16 %i8, i16 10
+  %while_entry10 = icmp ne i1 %ltmp9, i32 0
+  br i1 %while_entry10, label %while, label %while_end
+
+while_end:                                        ; preds = %while, %entry
+  %a11 = load [10 x i16], [10 x i16]* %a
+  %a13 = load i16, i16* %a12
+  call void @writeInteger(i16 %a13)
+  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))
+  %string = alloca [3 x i8]
+  store i8 92, i8* %str
+  store i8 110, i8* %str14
+  store i8 0, i8* %str15
+  call void @writeString(i8* %str_ptr)
+  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl, i32 0, i32 0))

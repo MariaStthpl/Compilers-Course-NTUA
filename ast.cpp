@@ -22,10 +22,16 @@ static GlobalVariable *TheNL;
 
 static Function *TheWriteInteger;
 static Function *TheWriteByte;
+static Function *TheWriteChar;
 static Function *TheWriteString;
 static Function *TheReadInteger;
 static Function *TheReadChar;
 static Function *TheReadString;
+
+static Function *TheStrlen;
+static Function *TheStrcmp;
+static Function *TheStrcpy;
+static Function *TheStrcat;
 
 // Useful LLVM types.
 static Type *i8 = IntegerType::get(TheContext, 8);
@@ -88,10 +94,17 @@ void llvm_compile_and_dump(FunctionAST *t)
                        "writeInteger", TheModule.get());
   // declare void @writeByte(i8)
   FunctionType *writeByte_type =
-      FunctionType::get(Type::getVoidTy(TheContext),
+      FunctionType::get(Type::getInt8Ty(TheContext),
                         std::vector<Type *>{i8}, false);
   TheWriteByte =
       Function::Create(writeByte_type, Function::ExternalLinkage,
+                       "ord", TheModule.get());
+  // declare void @writeChar(i8)
+  FunctionType *writeChar_type =
+      FunctionType::get(Type::getVoidTy(TheContext),
+                        std::vector<Type *>{i8}, false);
+  TheWriteChar =
+      Function::Create(writeChar_type, Function::ExternalLinkage,
                        "writeChar", TheModule.get());
   // declare void @writeString(i8*)
   FunctionType *writeString_type =
@@ -100,7 +113,7 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheWriteString =
       Function::Create(writeString_type, Function::ExternalLinkage,
                        "writeString", TheModule.get());
-
+  /*----------------------------READS----------------------------*/
   FunctionType *readInteger_type =
       FunctionType::get(Type::getInt16Ty(TheContext),
                         std::vector<Type *>(), false);
@@ -114,6 +127,45 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheReadChar =
       Function::Create(readChar_type, Function::ExternalLinkage,
                        "readChar", TheModule.get());
+
+  FunctionType *readString_type =
+      FunctionType::get(Type::getVoidTy(TheContext),
+                        std::vector<Type *>{i16, PointerType::getUnqual(i8)}, false);
+  TheReadString =
+      Function::Create(readString_type, Function::ExternalLinkage,
+                       "readString", TheModule.get());
+
+  /*-----------------------------------------------------------------------------------
+  --------------------------      Functions for strings      --------------------------
+  -----------------------------------------------------------------------------------*/
+  // strlen (s : reference byte []) : int
+  FunctionType *strlen_type =
+      FunctionType::get(Type::getInt16Ty(TheContext),
+                        std::vector<Type *>{PointerType::getUnqual(i8)}, false);
+  TheStrlen =
+      Function::Create(strlen_type, Function::ExternalLinkage,
+                       "strlen", TheModule.get());
+  //strcmp (s1 : reference byte [], s2 : reference byte []) : int
+  FunctionType *strcmp_type =
+      FunctionType::get(Type::getInt16Ty(TheContext),
+                        std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
+  TheStrcmp =
+      Function::Create(strcmp_type, Function::ExternalLinkage,
+                       "strcmp", TheModule.get());
+  //strcpy (trg : reference byte [], src : reference byte []) : proc
+  FunctionType *strcpy_type =
+      FunctionType::get(Type::getVoidTy(TheContext),
+                        std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
+  TheStrcpy =
+      Function::Create(strcpy_type, Function::ExternalLinkage,
+                       "strcpy", TheModule.get());
+  //strcat (trg : reference byte [], src : reference byte []) : proc
+  FunctionType *strcat_type =
+      FunctionType::get(Type::getVoidTy(TheContext),
+                        std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
+  TheStrcat =
+      Function::Create(strcat_type, Function::ExternalLinkage,
+                       "strcat", TheModule.get());
 
   // Define and start the main function.
   t->codegen();
@@ -849,58 +901,39 @@ Function *FunctionAST::codegen()
 
 Value *WriteInteger::codegen()
 {
-
   Value *n = p->codegen();
-
-  if (n->getType()->isIntegerTy(16))
-  {
-    Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
-    Value *idxList[] = {c32(0), c32(0)};
-    Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  }
-  else
-  {
+  if (!((n->getType()->isIntegerTy(16))))
     LogErrorV("Variable is wrong type(Integer expected)");
-  }
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return c8(0);
 }
 
 Value *WriteByte::codegen()
 {
   Value *n = p->codegen();
-
-  if (n->getType()->isIntegerTy(8))
-  {
-    Value *n16 = Builder.CreateZExtOrTrunc(n, i16, "ext");
-    Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
-    Value *idxList[] = {c32(0), c32(0)};
-    Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  }
-  else
-  {
+  if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
-  }
+  Value *ch = Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
+  Value *n16 = Builder.CreateZExtOrTrunc(ch, i16, "ext");
+  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return c8(0);
 }
 
 Value *WriteChar::codegen()
 {
   Value *n = p->codegen();
-
-  if (n->getType()->isIntegerTy(8)) //
-  {
-    Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
-    Value *idxList[] = {c32(0), c32(0)};
-    Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  }
-  else
-  {
+  if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
-  }
-
+  Builder.CreateCall(TheWriteChar, std::vector<Value *>{n});
+  Value *idxList[] = {c32(0), c32(0)};
+  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
+  Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
   return c8(0);
 }
 
@@ -932,22 +965,67 @@ Value *ReadInteger::codegen()
 Value *ReadByte::codegen()
 {
   Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
-  if (!(r->getType()->isIntegerTy(8)))
-    LogErrorV("Wrong type of input. ReadByte expects byte type");
-  return r;
+  Value *n8 = Builder.CreateZExtOrTrunc(r, i8, "ext");
+  // if (!(r->getType()->isIntegerTy(8)))
+  //   LogErrorV("Wrong type of input. ReadByte expects Byte type");
+  return n8;
 }
 
 Value *ReadChar::codegen()
 {
-  // Value *r = Builder.CreateCall(TheReadChar, std::vector<Value *>());
-  // if ()
+  Value *r = Builder.CreateCall(TheReadChar, std::vector<Value *>());
+  if (!(r->getType()->isIntegerTy(8)))
+    LogErrorV("Wrong type of input. ReadChar expects Byte type");
+  return r;
 }
 
 Value *ReadString::codegen()
 {
+  Value *n = expr->codegen();
+  Value *arr = array->codegen();
+  Builder.CreateCall(TheReadString, std::vector<Value *>{n, arr});
+  return c16(0);
 }
 
-// Value *Shrink::codegen()
-// {
-//   // return Builder.CreateZExt(n, i8, "ext");
-// }
+Value *Extend::codegen()
+{
+  Value *n = expr->codegen();
+  if (!(n->getType()->isIntegerTy(8)))
+    LogErrorV("Wrong type of input. Extend expects Byte type");
+  return Builder.CreateZExtOrTrunc(n, i16, "ext");
+}
+
+Value *Shrink::codegen()
+{
+  Value *n = expr->codegen();
+  if (!(n->getType()->isIntegerTy(16)))
+    LogErrorV("Wrong type of input. Shrink expects int type");
+  return Builder.CreateZExtOrTrunc(n, i8, "ext");
+}
+
+Value *Strlen::codegen()
+{
+  Value *n = Arr->codegen();
+  return Builder.CreateCall(TheStrlen, std::vector<Value *>{n}, "strlen");
+}
+
+Value *Strcmp::codegen()
+{
+  Value *arr1 = LArr->codegen();
+  Value *arr2 = RArr->codegen();
+  return Builder.CreateCall(TheStrcmp, std::vector<Value *>{arr1, arr2});
+}
+
+Value *Strcpy::codegen()
+{
+  Value *arr1 = LArr->codegen();
+  Value *arr2 = RArr->codegen();
+  return Builder.CreateCall(TheStrcpy, std::vector<Value *>{arr1, arr2});
+}
+
+Value *Strcat::codegen()
+{
+  Value *arr1 = LArr->codegen();
+  Value *arr2 = RArr->codegen();
+  return Builder.CreateCall(TheStrcat, std::vector<Value *>{arr1, arr2});
+}

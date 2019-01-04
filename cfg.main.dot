@@ -1,5 +1,0 @@
-digraph "CFG for 'main' function" {
-	label="CFG for 'main' function";
-
-	Node0x1e0c830 [shape=record,label="{entry:\l  %a = alloca [3 x i16]\l  %g = alloca [10 x i8]\l  %y = alloca i8\l  %x = alloca i16\l  store i8 114, i8* %y\l  %g1 = getelementptr [10 x i8], [10 x i8]* %g, i16 0, i32 0\l  store i8 101, i8* %g1\l  %g2 = load [10 x i8], [10 x i8]* %g\l  %g3 = getelementptr inbounds [10 x i8], [10 x i8]* %g, i16 0, i16 0\l  %g4 = load i8, i8* %g3\l  %ext = zext i8 %g4 to i16\l  call void @writeInteger(i16 %ext)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  call void @writeInteger(i16 97)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  %y5 = load i8, i8* %y\l  %ext6 = zext i8 %y5 to i16\l  call void @writeInteger(i16 %ext6)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  %calltmp = call i8 @hehe(i16 1)\l  %ext7 = zext i8 %calltmp to i16\l  call void @writeInteger(i16 %ext7)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  ret void\l}"];
-}

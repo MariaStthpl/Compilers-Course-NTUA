@@ -1,18 +1,16 @@
-New function: main
-	New function: hehe
+New function: cancer
+	New function: is_it
 
-		Inherited: 0
+					Inherited: 0
 
-		Locals: 1
-		l   0x1af6e38
+					Locals: 1
+					i   0
 
-Calling function: hehe
+Calling function: is_it
 
-	Inherited: 1
-	hehe
+	----func call with pointer
+		--func call array
 
-	Locals: 4
-	a   0x1af7878
-	g   0x1af77b8
-	x   0x1af7688
-	y   0x1af76f8
+							Inherited: 0
+
+							Locals: 0

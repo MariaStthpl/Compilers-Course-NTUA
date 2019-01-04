@@ -42,7 +42,6 @@ FunctionAST *t;
 }
 
 %token TINT TBYTE TREFERENCE
-%token T_EXNTEND T_SHRINK T_STRLEN T_STRCMP T_STRCPY T_STRCAT
 
 %token TIF "if"
 %token TELSE "else"
@@ -64,6 +63,13 @@ FunctionAST *t;
 %token TR_BYTE "readByte"
 %token TR_CHAR "readChar"
 %token TR_STRING "readString"
+%token T_EXNTEND "extend"
+%token T_SHRINK "shrink"
+%token T_STRLEN "strlen"
+%token T_STRCMP "strcmp"
+%token T_STRCPY "strcpy"
+%token T_STRCAT "strcat"
+
 %token<s> T_id
 %token<n> T_INT_CONST
 %token<c> T_CHAR_CONST
@@ -181,7 +187,10 @@ stmt:
 | "writeInteger" '(' expr ')' ';'     { $$ = new WriteInteger($3); }
 | "writeByte" '(' expr ')' ';'        { $$ = new WriteByte($3); }
 | "writeChar" '(' expr ')' ';'        { $$ = new WriteChar($3); }
+| "readString" '(' expr ',' T_id ')'  { $$ = new ReadString($3, new Id_ExprAST(*$5)); }
 | "writeString" '(' expr ')' ';'      { $$ = new WriteString($3); }
+| "strcpy" '(' expr ',' expr ')'      { $$ = new Strcpy($3, $5);  }
+| "strcat" '(' expr ',' expr ')'      { $$ = new Strcat($3, $5);  }
 ;
 
 l_value:
@@ -214,22 +223,25 @@ expr:
 | '+' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, $2); }   %prec UPLUS
 | '-' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, $2); }  %prec UMINUS
 | "readInteger" '(' ')'               { $$ = new ReadInteger(); }
-| "readByte" '(' ')'                  { $$ = new ReadByte(); }
-| "readChar" '(' ')'                  { $$ = new ReadByte(); }
-| "readString" '(' ')'                { $$ = new ReadString(); }
+| "readByte" '(' ')'                  { $$ = new ReadByte();    }
+| "readChar" '(' ')'                  { $$ = new ReadChar();    }
+| "shrink" '(' expr ')'               { $$ = new Shrink($3);    }
+| "extend" '(' expr ')'               { $$ = new Extend($3);    }
+| "strcmp" '(' expr ',' expr ')'      { $$ = new Strcmp($3,$5); }
+| "strlen" '(' expr ')'               { $$ = new Strlen($3); }
 ;
 
 cond:
-  "true"                               { $$ = new ComparisonOp_CondAST(new IntConst_ExprAST(0), L, new IntConst_ExprAST(1)); }
-| "false"                              { $$ = new ComparisonOp_CondAST(new IntConst_ExprAST(1), L, new IntConst_ExprAST(0)); }
+  "true"                              { $$ = new ComparisonOp_CondAST(new IntConst_ExprAST(0), L, new IntConst_ExprAST(1)); }
+| "false"                             { $$ = new ComparisonOp_CondAST(new IntConst_ExprAST(1), L, new IntConst_ExprAST(0)); }
 | '(' cond ')'                        { $$ = $2;                                                                    }
 | '!' cond                            { $$ = new LogicalOp_CondAST($2, NOT, $2);                                    }
 | expr '<' expr                       { $$ = new ComparisonOp_CondAST($1, L, $3);                                   }
 | expr '>' expr                       { $$ = new ComparisonOp_CondAST($1, G, $3);                                   }
-| expr "<=" expr                     { $$ = new ComparisonOp_CondAST($1, LE, $3);                                  }
-| expr ">=" expr                     { $$ = new ComparisonOp_CondAST($1, GE, $3);                                  }
-| expr "==" expr                     { $$ = new ComparisonOp_CondAST($1, EQ, $3);                                  }
-| expr "!=" expr                    { $$ = new ComparisonOp_CondAST($1, NE, $3);                                  }
+| expr "<=" expr                      { $$ = new ComparisonOp_CondAST($1, LE, $3);                                  }
+| expr ">=" expr                      { $$ = new ComparisonOp_CondAST($1, GE, $3);                                  }
+| expr "==" expr                      { $$ = new ComparisonOp_CondAST($1, EQ, $3);                                  }
+| expr "!=" expr                      { $$ = new ComparisonOp_CondAST($1, NE, $3);                                  }
 | cond '&' cond                       { $$ = new LogicalOp_CondAST($1, AND, $3);                                    }
 | cond '|' cond                       { $$ = new LogicalOp_CondAST($1, OR, $3);                                     }
 ;
@@ -237,8 +249,9 @@ cond:
 %%
 
 void yyerror (const char *msg) {
+  fprintf(stderr, "----------ALAN DEBUG MESSAGES----------\n\n");
   fprintf(stderr, "Alan error: %s\n", msg);
-  fprintf(stderr, "Do you even know Alan? Line %d is so wrong \n",
+  fprintf(stderr, "Do you even know Alan? Line %d is so wrong \n\n\n\n",
           linenumber);
   exit(1);
 }

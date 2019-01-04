@@ -1,23 +1,18 @@
-Function context does not match Module context!
-void ()* @main
-Stored value type does not match pointer operand type!
-  store i8 114, i8* %y
- i8Stored value type does not match pointer operand type!
-  store i8 101, i8* %g1
- i8Call parameter type does not match function signature!
-i16 1
- i16  %calltmp = call i8 @hehe(i16 1)
-Function context does not match Module context!
-i8 (i16)* @hehe
-Function return type does not match operand type of return inst!
-  ret i8 104
- i8The faulty IR is:
+rm: cannot remove 'a.out': No such file or directory
+rm: cannot remove 'a.s': No such file or directory
+Error: Unknown variable name
+Basic Block in function 'main' does not have terminator!
+label %entry
+Basic Block in function 'is_it' does not have terminator!
+label %entry
+The faulty IR is:
 ------------------------------------------------
 
-WARNING: You're attempting to print out a bitcode file.
-This is inadvisable as it may cause display problems. If
-you REALLY want to taste LLVM bitcode first-hand, you
-can force output with the `-f' option.
-
-Writing 'cfg.main.dot'...
-Writing 'cfg.hehe.dot'...
+llc: a.ll:32:1: error: expected instruction opcode
+}
+^
+clang: error: no such file or directory: 'a.s'
+opt: a.ll:32:1: error: expected instruction opcode
+}
+^
+do.sh: 13: do.sh: ./a.out: not found

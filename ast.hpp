@@ -445,10 +445,13 @@ public:
   virtual Value *codegen() override;
 };
 
-class ReadString : public ExprAST
+class ReadString : public StmtAST
 {
+  ExprAST *expr;
+  Id_ExprAST* array;
+
 public:
-  ReadString() {}
+  ReadString(ExprAST *expr, Id_ExprAST* array) : expr(std::move(expr)), array(std::move(array)) {}
   virtual Value *codegen() override;
 };
 
@@ -469,6 +472,47 @@ public:
   Shrink(ExprAST *expr) : expr(std::move(expr)) {}
   virtual Value *codegen() override;
 };
+
+class Strlen : public ExprAST
+{
+  ExprAST *Arr;
+
+public:
+  Strlen(ExprAST *Arr) : Arr(std::move(Arr)) {}
+  virtual Value *codegen() override;
+};
+
+class Strcpy : public StmtAST
+{
+  ExprAST *LArr;
+  ExprAST *RArr;
+
+public:
+  Strcpy(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  virtual Value *codegen() override;
+};
+
+class Strcmp : public ExprAST
+{
+  ExprAST *LArr;
+  ExprAST *RArr;
+
+public:
+  Strcmp(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  virtual Value *codegen() override;
+};
+
+class Strcat : public StmtAST
+{
+  ExprAST *LArr;
+  ExprAST *RArr;
+
+public:
+  Strcat(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  virtual Value *codegen() override;
+};
+
+
 
 void llvm_compile_and_dump(FunctionAST *t);
 
