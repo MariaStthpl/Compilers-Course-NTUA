@@ -238,51 +238,56 @@ Value *CharConst_ExprAST::codegen()
 // IR for <id>
 Value *Id_ExprAST::codegen()
 {
-  // myfile << "<id>: " << Name;
   // Look this variable up in the function.
-  CodeGenBlock *block = context.getTop();
-  AllocaInst *V;
-  do
-  {
-    V = block->getLocals()[Name];
-    if (!V)
-      block = context.getPrev(block);
-    else
-    {
-      if (PointerType::classof(V->getAllocatedType()))
-      {
-        // id in function -> using pointer
-        std::vector<Value *> indexList;
-        indexList.push_back(c16(0));
-        LoadInst *ldinst = Builder.CreateLoad(V, Name);
-        GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-        return Builder.CreateLoad(gepInst, Name);
-        return gepInst;
-      }
-      else if (ArrayType::classof(V->getAllocatedType()))
-      {
-        std::vector<Value *> indexList;
-        indexList.push_back(c8(0));
-        indexList.push_back(c8(0));
-        GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-        return gepInst;
-      }
-      else
-      {
-        return Builder.CreateLoad(V, Name.c_str());
-      }
-    }
-  } while (block != nullptr);
-
+  AllocaInst *V = context.locals()[Name];
   if (!V)
+  {
     LogErrorV("Unknown variable name");
+    exit(1);
+  }
+
+  if (PointerType::classof(V->getAllocatedType()) && ArrayType::classof(V->getAllocatedType()->getPointerElementType()))
+  {
+    // id of array (in nested function) with pointer of ArrayType
+    std::vector<Value *> indexList;
+    indexList.push_back(c16(0));
+    indexList.push_back(c16(0));
+    LoadInst *ldinst = Builder.CreateLoad(V, Name);
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType()->getPointerElementType()), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    return gepInst;
+  }
+  else if (PointerType::classof(V->getAllocatedType()))
+  {
+    // id (in nested function) with pointer of IntegerType
+    std::vector<Value *> indexList;
+    indexList.push_back(c16(0));
+    LoadInst *ldinst = Builder.CreateLoad(V, Name);
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    // return Builder.CreateLoad(gepInst, Name);
+    return gepInst;
+  }
+  else if (ArrayType::classof(V->getAllocatedType()))
+  {
+    // id of array of ArrayType
+    std::vector<Value *> indexList;
+    indexList.push_back(c8(0));
+    indexList.push_back(c8(0));
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    return gepInst;
+  }
+  else
+  {
+    // id of IntegerType
+    Builder.CreateLoad(V, Name.c_str());
+    return V;
+  }
+
   return V;
 }
 
 // IR for <id>[<expr>]
 Value *ArrayElement_ExprAST::codegen()
 {
-  // myfile << "<id>[<expr>]: " << Name << "[" << dyn_cast<ConstantInt>(getExpr())->getSExtValue() << "]" << std::endl;
   TypeCheck();
 
   AllocaInst *arr = context.locals()[Name];
@@ -290,26 +295,25 @@ Value *ArrayElement_ExprAST::codegen()
 
   if (PointerType::classof(arr->getAllocatedType()))
   {
-    // array element in function -> using pointer
+    // array element (in nested function) with pointer of ArrayType
     std::vector<Value *> indexList;
+    indexList.push_back(c32(0));
     indexList.push_back(index);
     LoadInst *ldinst = Builder.CreateLoad(arr, Name);
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
     return Builder.CreateLoad(gepInst, Name);
-    // Builder.CreateLoad(gepInst, Name);
     // return arr;
   }
   else
   {
-    // array element in main
+    // array element of ArrayType
     std::vector<Value *> indexList;
-    indexList.push_back(c16(0));
+    indexList.push_back(c32(0));
     indexList.push_back(index);
-    Builder.CreateLoad(arr, Name); // needed?
+    // Builder.CreateLoad(arr, Name); // needed?
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-    return Builder.CreateLoad(gepInst, Name);
-    // Builder.CreateSExtOrBitCast(Builder.CreateLoad(gepInst, Name), i16);
-    // return arr;
+    // return Builder.CreateLoad(gepInst, Name);
+    return gepInst;
   }
 }
 
@@ -464,117 +468,19 @@ Value *Assignment_StmtAST::codegen()
 {
   TypeCheck();
 
-  // myfile << "⟨l-value⟩ '=' ⟨expr⟩: \t";
+  // evaluate r-value
   Value *Val = RHS->codegen();
   if (!Val)
     return nullptr;
 
-  ArrayElement_ExprAST *LHSA = dynamic_cast<ArrayElement_ExprAST *>(LHS);
-  if (!LHSA)
-  {
-    /* assignment in identifier */
-    Id_ExprAST *LHSE = dynamic_cast<Id_ExprAST *>(LHS);
-    if (!LHSE)
-      return LogErrorV("destination of '=' is not a variable");
+  // if r-value is pointer, load its value
+  if (PointerType::classof(Val->getType()))
+    Val = Builder.CreateLoad(Val, "var");
 
-    CodeGenBlock *block = context.getTop();
-    AllocaInst *Variable;
-    do
-    {
-      Variable = block->getLocals()[LHSE->getName()];
-      if (!Variable)
-      {
-        LogErrorV("Unknown variable name in current block");
-        printf("searching in block: %d\n", block->getId());
-        block = context.getPrev(block);
-      }
-      else
-      {
-        // identifier found!
-        //in function
-        if (PointerType::classof(Variable->getAllocatedType()))
-        {
-          Value *index = c16(0);
-          Value *indexList[] = {ConstantInt::get(index->getType(), 0)};
-          LoadInst *ldinst = Builder.CreateLoad(Variable, LHSE->getName());
-          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(Variable->getAllocatedType()->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
-          Builder.CreateStore(Val, gepInst);
-        }
-        // array
-        else if (ArrayType::classof(Variable->getAllocatedType()))
-        {
-          // assign string
-          StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(RHS);
-          if (str)
-          {
-            /* check if out of bounds */
-            if ((str->getString().length() - 3) < Variable->getAllocatedType()->getArrayNumElements())
-            {
-              // in bounds
-              size_t i;
-              for (i = 1; i < str->getString().length() - 1; i++)
-              {
-                Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i - 1)), new CharConst_ExprAST(str->getString()[i]));
-                assignelement->codegen();
-              }
-              Assignment_StmtAST *assignelement = new Assignment_StmtAST(new ArrayElement_ExprAST(LHSE->getName(), new IntConst_ExprAST(i - 1)), new CharConst_ExprAST('\0'));
-              assignelement->codegen();
-            }
-            else
-            {
-              // out of bounds
-              LogErrorV("Array out of bounds");
-              return c16(1);
-            }
-          }
-        }
-        // id
-        else
-        {
-          Builder.CreateStore(Val, Variable);
-        }
-        break;
-      }
-    } while (block != nullptr);
-  }
-  else
-  {
-    /* assignment in array element */
-    CodeGenBlock *block = context.getTop();
-    AllocaInst *arr;
-    do
-    {
-      arr = block->getLocals()[LHSA->getName()];
-      if (!arr)
-      {
-        LogErrorV("Unknown array name in current block");
-        block = context.getPrev(block);
-      }
-      else
-      {
-        Value *t = LHSA->getExpr();
-        Value *index = Builder.CreateSExt(t, i32, "ext");
-        std::vector<Value *> indexList;
+  // l-value is always a pointer
+  Value *V = LHS->codegen();
 
-        if (PointerType::classof(arr->getAllocatedType()))
-        {
-          indexList.push_back(index);
-          LoadInst *ldinst = Builder.CreateLoad(arr, LHSA->getName());
-          GetElementPtrInst *gepInst = GetElementPtrInst::Create((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), LHSA->getName(), context.currentBlock());
-          Builder.CreateStore(Val, gepInst);
-        }
-        else
-        {
-          indexList.push_back(c16(0));
-          indexList.push_back(index);
-          GetElementPtrInst *gepInst = GetElementPtrInst::Create(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), LHSA->getName(), context.currentBlock());
-          Builder.CreateStore(Val, gepInst);
-        }
-        break;
-      }
-    } while (block != NULL);
-  }
-  return Val;
+  return Builder.CreateStore(Val, V);
 }
 
 void Assignment_StmtAST::TypeCheck()
@@ -585,56 +491,17 @@ void Assignment_StmtAST::TypeCheck()
   Type *LT = L->getType();
   Type *RT = R->getType();
 
-  if (PointerType::classof(L->getType()))
-  {
-    LogErrorV("\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa\n");
-  }
-
-  if (L->getType()->isIntegerTy(16))
-    LogErrorV("\nLeft is 16\n");
-  else if (L->getType()->isIntegerTy(8))
-    LogErrorV("\nLeft is 8\n");
-
-  if (R->getType()->isIntegerTy(16))
-    LogErrorV("\nRight is 16\n");
-  else if (R->getType()->isIntegerTy(8))
-    LogErrorV("\nRight is 8\n");
-
   if (LT->isPointerTy())
-    LT = LT->getPointerElementType(); //getPointerElementType()
+    LT = LT->getPointerElementType();
 
   if (RT->isPointerTy())
-    RT = RT->getPointerElementType(); //getPointerElementType()
-
-  if (LT->isPointerTy() && LT->getPointerElementType()->isArrayTy() )
-    LT = LT->getPointerElementType()->getArrayElementType(); //getPointerElementType()
-
-  if (RT->isPointerTy() && RT->getPointerElementType()->isArrayTy() )
-    RT = RT->getPointerElementType()->getArrayElementType(); //getPointerElementType()
-
-
-  if (LT->isArrayTy())
-    LT = LT->getArrayElementType();
-
-  if (RT->isArrayTy())
-    RT = RT->getArrayElementType();
-
-  // if (L->getType()->isIntegerTy(16))
-  //   LogErrorV("\nLeft is 16\n");
-  // else if (L->getType()->isIntegerTy(8))
-  //   LogErrorV("\nLeft is 8\n");
-
-  // if (R->getType()->isIntegerTy(16))
-  //   LogErrorV("Right is 16\n");
-  // else if (R->getType()->isIntegerTy(8))
-  //   LogErrorV("Right is 8\n");
+    RT = RT->getPointerElementType();
 
   if (!(LT->isIntegerTy(16) && (RT->isIntegerTy(16))) && !(LT->isIntegerTy(8) && (RT->isIntegerTy(8))))
   {
     LogErrorV("\noperands of assignement operation must be of same type\n");
     exit(1);
   }
-
   return;
 }
 
@@ -1016,6 +883,9 @@ Function *FunctionAST::codegen()
 Value *WriteInteger::codegen()
 {
   Value *n = p->codegen();
+  if (PointerType::classof(n->getType()))
+    n = Builder.CreateLoad(n);
+
   if (!((n->getType()->isIntegerTy(16))))
     LogErrorV("Variable is wrong type(Integer expected)");
   Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
@@ -1028,6 +898,9 @@ Value *WriteInteger::codegen()
 Value *WriteByte::codegen()
 {
   Value *n = p->codegen();
+  if (PointerType::classof(n->getType()))
+    n = Builder.CreateLoad(n);
+
   if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
   Value *ch = Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
@@ -1042,6 +915,8 @@ Value *WriteByte::codegen()
 Value *WriteChar::codegen()
 {
   Value *n = p->codegen();
+  if (PointerType::classof(n->getType()))
+    n = Builder.CreateLoad(n);
   if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
   Builder.CreateCall(TheWriteChar, std::vector<Value *>{n});
@@ -1104,6 +979,8 @@ Value *ReadString::codegen()
 Value *Extend::codegen()
 {
   Value *n = expr->codegen();
+  if (PointerType::classof(n->getType()))
+    n = Builder.CreateLoad(n);
   if (!(n->getType()->isIntegerTy(8)))
     LogErrorV("Wrong type of input. Extend expects Byte type");
   return Builder.CreateZExtOrTrunc(n, i16, "ext");
@@ -1112,6 +989,8 @@ Value *Extend::codegen()
 Value *Shrink::codegen()
 {
   Value *n = expr->codegen();
+  if (PointerType::classof(n->getType()))
+    n = Builder.CreateLoad(n);
   if (!(n->getType()->isIntegerTy(16)))
     LogErrorV("Wrong type of input. Shrink expects int type");
   return Builder.CreateZExtOrTrunc(n, i8, "ext");
