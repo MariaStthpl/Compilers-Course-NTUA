@@ -211,6 +211,14 @@ Value *LogErrorV(const char *Str)
   return nullptr;
 }
 
+Value *loadValue(Value *p)
+{
+  if (PointerType::classof(p->getType()))
+    return Builder.CreateLoad(p);
+  else
+    return p;
+}
+
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of the function.  This is used for mutable variables etc.
 static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::string &VarName, Type *t)
 {
@@ -228,11 +236,21 @@ Value *IntConst_ExprAST::codegen()
   return c16(Val);
 }
 
+Type *IntConst_ExprAST::getT()
+{
+  return i16;
+}
+
 // IR for <char-const>
 Value *CharConst_ExprAST::codegen()
 {
   // myfile << "<char-const>: " << Val;
   return c8(Val);
+}
+
+Type *CharConst_ExprAST::getT()
+{
+  return i8;
 }
 
 // IR for <id>
@@ -285,10 +303,14 @@ Value *Id_ExprAST::codegen()
   return V;
 }
 
+Type *Id_ExprAST::getT()
+{
+  return context.locals_type()[Name];
+}
+
 // IR for <id>[<expr>]
 Value *ArrayElement_ExprAST::codegen()
 {
-  TypeCheck();
 
   AllocaInst *arr = context.locals()[Name];
   Value *index = expr->codegen();
@@ -301,8 +323,8 @@ Value *ArrayElement_ExprAST::codegen()
     indexList.push_back(index);
     LoadInst *ldinst = Builder.CreateLoad(arr, Name);
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-    return Builder.CreateLoad(gepInst, Name);
-    // return arr;
+    // return Builder.CreateLoad(gepInst, Name);
+    return gepInst;
   }
   else
   {
@@ -315,6 +337,12 @@ Value *ArrayElement_ExprAST::codegen()
     // return Builder.CreateLoad(gepInst, Name);
     return gepInst;
   }
+}
+
+Type *ArrayElement_ExprAST::getT()
+{
+  TypeCheck();
+  return context.locals_type()[Name];
 }
 
 void ArrayElement_ExprAST::TypeCheck()
@@ -352,15 +380,22 @@ Value *StringLiteral_ExprAST::codegen()
   return gepInst;
 }
 
+Type *StringLiteral_ExprAST::getT()
+{
+  return PointerType::getUnqual(i8);
+}
+
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
 Value *ArithmeticOp_ExprAST::codegen()
 {
-  TypeCheck();
-
   Value *L = LHS->codegen();
   Value *R = RHS->codegen();
   if (!L || !R)
     return nullptr;
+
+  L = loadValue(L);
+  R = loadValue(R);
+
   switch (Op)
   {
   case PLUS:
@@ -378,19 +413,21 @@ Value *ArithmeticOp_ExprAST::codegen()
   }
 }
 
-void ArithmeticOp_ExprAST::TypeCheck()
+Type *ArithmeticOp_ExprAST::getT()
 {
+  Value *L = LHS->codegen();
+  Value *R = RHS->codegen();
+  L = loadValue(L);
+  R = loadValue(R);
   if (!Unary)
   {
-    Value *L = LHS->codegen();
-    Value *R = RHS->codegen();
     if ((L->getType()) != (R->getType()))
     {
       LogErrorV("\noperands of arithmetic operation must be of same type\n");
       exit(1);
     }
   }
-  return;
+  return R->getType();
 }
 
 /* ------------------------------------------- IR for CondAST ------------------------------------------- */
@@ -404,6 +441,10 @@ Value *ComparisonOp_CondAST::codegen()
   Value *r = RHS->codegen();
   if (!l || !r)
     return nullptr;
+
+  l = loadValue(l);
+  r = loadValue(r);
+
   switch (Op)
   {
   case L:
@@ -425,15 +466,15 @@ Value *ComparisonOp_CondAST::codegen()
 
 void ComparisonOp_CondAST::TypeCheck()
 {
-
   Value *L = LHS->codegen();
   Value *R = RHS->codegen();
+  L = loadValue(L);
+  R = loadValue(R);
   if ((L->getType()) != (R->getType()))
   {
     LogErrorV("\noperands of comparison operation must be of same type\n");
     exit(1);
   }
-
   return;
 }
 
@@ -444,6 +485,10 @@ Value *LogicalOp_CondAST::codegen()
   Value *r = RHS->codegen();
   if (!l)
     return nullptr;
+
+  l = loadValue(l);
+  r = loadValue(r);
+
   switch (Op)
   {
   case AND:
@@ -474,8 +519,7 @@ Value *Assignment_StmtAST::codegen()
     return nullptr;
 
   // if r-value is pointer, load its value
-  if (PointerType::classof(Val->getType()))
-    Val = Builder.CreateLoad(Val, "var");
+  Val = loadValue(Val);
 
   // l-value is always a pointer
   Value *V = LHS->codegen();
@@ -548,35 +592,25 @@ Value *FuncCall::codegen()
       {
         myfile << std::endl
                << "\t----func call with pointer" << std::endl;
-        Id_ExprAST *temp = dynamic_cast<Id_ExprAST *>(Args[i]);
 
-        CodeGenBlock *block = context.getTop();
-        AllocaInst *V;
-        do
+        Id_ExprAST *temp = dynamic_cast<Id_ExprAST *>(Args[i]);
+        Value *V = context.locals()[temp->getName()];
+        V = loadValue(V);
+        if (ArrayType::classof(V->getType()))
         {
-          V = block->getLocals()[temp->getName()];
-          if (!V)
-            block = context.getPrev(block);
-          else
-          {
-            if (ArrayType::classof(V->getAllocatedType()))
-            {
-              myfile << "\t\t--func call array" << std::endl;
-              std::vector<Value *> indexList;
-              indexList.push_back(c16(0));
-              indexList.push_back(c16(0));
-              GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock());
-              ArgsV.push_back(gepInst);
-            }
-            else
-            {
-              std::vector<Value *> indexList;
-              indexList.push_back(c16(0));
-              ArgsV.push_back(GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock()));
-            }
-            break;
-          }
-        } while (block != nullptr);
+          myfile << "\t\t--func call array" << std::endl;
+          std::vector<Value *> indexList;
+          indexList.push_back(c16(0));
+          indexList.push_back(c16(0));
+          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock());
+          ArgsV.push_back(gepInst);
+        }
+        else
+        {
+          std::vector<Value *> indexList;
+          indexList.push_back(c16(0));
+          ArgsV.push_back(GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock()));
+        }
         if (!V)
           LogErrorV("Unknown variable name");
       }
@@ -605,8 +639,13 @@ Value *FuncCall::codegen()
       ArgsV.push_back(gepInst);
     }
   }
-
   return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+}
+
+Type *FuncCall::getT()
+{
+
+  return context.getTop()->getFunction()->getFunctionType()->getReturnType();
 }
 
 // IR for “if” '(' ⟨cond⟩ ')' ⟨stmt⟩ [ “else” ⟨stmt⟩ ]
@@ -618,30 +657,29 @@ Value *If_StmtAST::codegen()
 
   CondV = Builder.CreateICmpNE(CondV, c32(0), "ifcond");
 
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  Function *TheFunction = Builder.GetInsertBlock()->getParent(); //must fix
 
   BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
-  context.pushBlock(ThenBB, nullptr);
   BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
   BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
 
   Builder.CreateCondBr(CondV, ThenBB, ElseBB);
 
-  // Builder.SetInsertPoint(ThenBB);
-  Builder.SetInsertPoint(context.currentBlock());
+  Builder.SetInsertPoint(ThenBB);
   Value *ThenV = Then->codegen();
-
-  if (!ThenV)
+  if (!ThenV) 
     return nullptr;
 
+  // Builder.SetInsertPoint(ThenBB);
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateBr(MergeBB);
-  ThenBB = Builder.GetInsertBlock();
+
+  // ThenBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(ElseBB);
-  context.pushBlock(ElseBB, nullptr);
-  // Builder.SetInsertPoint(ElseBB);
-  Builder.SetInsertPoint(context.currentBlock());
+  // context.pushBlock(ElseBB, nullptr);
+  Builder.SetInsertPoint(ElseBB);
+  // Builder.SetInsertPoint(context.currentBlock());
 
   Value *ElseV = nullptr;
   if (Else != nullptr)
@@ -650,16 +688,71 @@ Value *If_StmtAST::codegen()
     if (!ElseV)
       return nullptr;
   }
+//?
+  // Builder.SetInsertPoint(ElseBB);
 
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateBr(MergeBB);
-  ElseBB = Builder.GetInsertBlock();
+  // ElseBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(MergeBB);
-  context.pushBlock(MergeBB, nullptr);
+  Builder.SetInsertPoint(MergeBB);
+
+
+  // context.pushBlock(MergeBB, nullptr);
   // Builder.SetInsertPoint(MergeBB);
-  Builder.SetInsertPoint(context.currentBlock());
+  // Builder.SetInsertPoint(MergeBB);
   return c32(0);
+
+  // Value *CondV = Cond->codegen();
+  // if (!CondV)
+  //   return nullptr;
+
+  // CondV = Builder.CreateICmpNE(CondV, c32(0), "ifcond");
+
+  // Function *TheFunction = Builder.GetInsertBlock()->getParent(); //must fix
+
+  // BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+  // context.pushBlock(ThenBB, nullptr);
+  // BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
+  // BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
+
+  // Builder.CreateCondBr(CondV, ThenBB, ElseBB);
+
+  // // Builder.SetInsertPoint(ThenBB);
+  // Builder.SetInsertPoint(context.currentBlock());
+  // Value *ThenV = Then->codegen();
+
+  // if (!ThenV) 
+  //   return nullptr;
+
+  // if (!Builder.GetInsertBlock()->getTerminator())
+  //   Builder.CreateBr(MergeBB);
+
+  // ThenBB = Builder.GetInsertBlock();
+
+  // TheFunction->getBasicBlockList().push_back(ElseBB);
+  // context.pushBlock(ElseBB, nullptr);
+  // // Builder.SetInsertPoint(ElseBB);
+  // Builder.SetInsertPoint(context.currentBlock());
+
+  // Value *ElseV = nullptr;
+  // if (Else != nullptr)
+  // {
+  //   ElseV = Else->codegen();
+  //   if (!ElseV)
+  //     return nullptr;
+  // }
+
+  // if (!Builder.GetInsertBlock()->getTerminator())
+  //   Builder.CreateBr(MergeBB);
+  // ElseBB = Builder.GetInsertBlock();
+
+  // TheFunction->getBasicBlockList().push_back(MergeBB);
+  // context.pushBlock(MergeBB, nullptr);
+  // // Builder.SetInsertPoint(MergeBB);
+  // Builder.SetInsertPoint(context.currentBlock());
+  // return c32(0);
 }
 
 // IR for “while” '(' ⟨cond⟩ ')' ⟨stmt⟩
@@ -700,15 +793,35 @@ Value *While_StmtAST::codegen()
 // IR for “return” [ ⟨expr⟩ ]
 Value *Return_Stmt::codegen()
 {
+  // TypeCheck();
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
     return c32(0);
   }
   Value *returnValue = expr->codegen();
+  returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
   // std::cout << " return  " <<  context.id << std::endl;
   return returnValue;
+}
+
+void Return_Stmt::TypeCheck()
+{
+  if (expr == NULL )
+  {
+    LogErrorV("NUUUUUUUUUUL");
+    // if (!context.getTop()->getFunction()->getFunctionType()->getReturnType()->isVoidTy())
+    // {
+    //   LogErrorV("Return type of function differs from defined type");
+    //   exit(1);
+    // }
+  }
+  else if (expr->getT() != context.getTop()->getFunction()->getFunctionType()->getReturnType())
+  {
+    LogErrorV("Return type of function differs from defined type");
+    exit(1);
+  }
 }
 
 /* ------------------------------------------- IR for Function ------------------------------------------- */
@@ -759,6 +872,7 @@ Value *FuncBody_AST::codegen()
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
       context.locals()[VarName] = Alloca;
+      context.locals_type()[VarName] = t;
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -811,7 +925,10 @@ Function *FunctionAST::codegen()
   Builder.SetInsertPoint(context.currentBlock());
 
   if (context.id > 1)
+  {
     context.locals() = prev->getLocals();
+    context.locals_type() = prev->getLocals_Types();
+  }
 
   // Record the function arguments in the NamedValues map.
   for (auto &Arg : TheFunction->args())
@@ -822,6 +939,7 @@ Function *FunctionAST::codegen()
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
     context.locals()[Arg.getName()] = Alloca;
+    context.locals_type()[Arg.getName()] = Arg.getType();
   }
 
   if (Body->codegen())
@@ -855,8 +973,7 @@ Function *FunctionAST::codegen()
     }
 
     // Finish off the function.
-    Builder.SetInsertPoint(context.currentBlock());
-    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     context.popBlock();
 
     // Validate the generated code, checking for consistency.
@@ -865,8 +982,7 @@ Function *FunctionAST::codegen()
   }
   else
   {
-    Builder.SetInsertPoint(context.currentBlock());
-    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), context.currentBlock());
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     context.popBlock();
     verifyFunction(*TheFunction);
     return TheFunction;
@@ -883,9 +999,7 @@ Function *FunctionAST::codegen()
 Value *WriteInteger::codegen()
 {
   Value *n = p->codegen();
-  if (PointerType::classof(n->getType()))
-    n = Builder.CreateLoad(n);
-
+  n = loadValue(n);
   if (!((n->getType()->isIntegerTy(16))))
     LogErrorV("Variable is wrong type(Integer expected)");
   Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
@@ -898,9 +1012,7 @@ Value *WriteInteger::codegen()
 Value *WriteByte::codegen()
 {
   Value *n = p->codegen();
-  if (PointerType::classof(n->getType()))
-    n = Builder.CreateLoad(n);
-
+  n = loadValue(n);
   if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
   Value *ch = Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
@@ -915,8 +1027,7 @@ Value *WriteByte::codegen()
 Value *WriteChar::codegen()
 {
   Value *n = p->codegen();
-  if (PointerType::classof(n->getType()))
-    n = Builder.CreateLoad(n);
+  n = loadValue(n);
   if (!((n->getType()->isIntegerTy(8))))
     LogErrorV("Variable is wrong type(Byte expected)");
   Builder.CreateCall(TheWriteChar, std::vector<Value *>{n});
@@ -979,8 +1090,7 @@ Value *ReadString::codegen()
 Value *Extend::codegen()
 {
   Value *n = expr->codegen();
-  if (PointerType::classof(n->getType()))
-    n = Builder.CreateLoad(n);
+  n = loadValue(n);
   if (!(n->getType()->isIntegerTy(8)))
     LogErrorV("Wrong type of input. Extend expects Byte type");
   return Builder.CreateZExtOrTrunc(n, i16, "ext");
@@ -989,8 +1099,7 @@ Value *Extend::codegen()
 Value *Shrink::codegen()
 {
   Value *n = expr->codegen();
-  if (PointerType::classof(n->getType()))
-    n = Builder.CreateLoad(n);
+  n = loadValue(n);
   if (!(n->getType()->isIntegerTy(16)))
     LogErrorV("Wrong type of input. Shrink expects int type");
   return Builder.CreateZExtOrTrunc(n, i8, "ext");

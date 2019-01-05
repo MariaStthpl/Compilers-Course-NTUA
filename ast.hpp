@@ -28,10 +28,12 @@ public:
   Function *fun;
   CodeGenBlock *prev;
   BasicBlock *block;
-  Value *returnValue = nullptr ;
+  Value *returnValue = nullptr;
   std::map<std::string, AllocaInst *> locals;
+  std::map<std::string, Type *> locals_type;
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
+  std::map<std::string, Type *> &getLocals_Types() { return locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
   void setId(int n) { id = n; }
   int getId() { return id; }
@@ -48,6 +50,7 @@ public:
   Module *module;
   CodeGenContext() {}
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
+  std::map<std::string, Type *> &locals_type() { return blocks.top()->locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return blocks.top()->inherited; }
   BasicBlock *currentBlock() { return blocks.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
@@ -117,12 +120,14 @@ typedef enum
   MOD
 } arithmetic_ops;
 
+
 /* ExprAST - Base class for all expression nodes. */
 class ExprAST
 {
 public:
   virtual ~ExprAST() {}
   virtual Value *codegen() = 0;
+  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
 };
 
 /* StmtAST - Base class for all statement nodes. */
@@ -131,6 +136,8 @@ class StmtAST
 public:
   virtual ~StmtAST() {}
   virtual Value *codegen() = 0;
+  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
+  virtual void TypeCheck(){ return ; };
 };
 
 /* CondAST - Base class for all condition nodes. */
@@ -142,6 +149,7 @@ public:
   // CondAST(double Val) : Val(Val){};
   virtual ~CondAST() {}
   virtual Value *codegen() = 0;
+  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
 };
 
 /* ------------------------------------------- ExprAST ------------------------------------------- */
@@ -155,6 +163,7 @@ class IntConst_ExprAST : public ExprAST
 public:
   IntConst_ExprAST(int Val) : Val(Val){};
   virtual Value *codegen() override;
+  virtual Type *getT() override;
 };
 
 // <char-const>
@@ -165,6 +174,7 @@ class CharConst_ExprAST : public ExprAST
 public:
   CharConst_ExprAST(char Val) : Val(Val){};
   virtual Value *codegen() override;
+  virtual Type *getT() override;
 };
 
 /*  lvalue: id, array element, string literal */
@@ -178,6 +188,7 @@ public:
   Id_ExprAST(const std::string &Name) : Name(Name) {}
   virtual Value *codegen() override;
   const std::string &getName() const { return Name; }
+  virtual Type *getT() override;
 };
 
 // <id>[<expr>]
@@ -192,6 +203,7 @@ public:
   const std::string &getName() const { return Name; }
   Value *getExpr() { return expr->codegen(); }
   void TypeCheck();
+  virtual Type *getT() override;
 };
 
 //TODO: string literal
@@ -203,6 +215,7 @@ public:
   StringLiteral_ExprAST(std::string &str_literal) : string_literal(str_literal) {}
   virtual Value *codegen() override;
   const std::string &getString() const { return string_literal; }
+  virtual Type *getT() override;
 };
 
 // ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
@@ -216,7 +229,7 @@ class ArithmeticOp_ExprAST : public ExprAST
 public:
   ArithmeticOp_ExprAST(ExprAST *LHS, arithmetic_ops op, ExprAST *RHS, bool Unary) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)), Unary(std::move(Unary)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  virtual Type *getT() override;
 };
 
 /* ------------------------------------------- CondAST ------------------------------------------- */
@@ -257,8 +270,8 @@ class Assignment_StmtAST : public StmtAST
 
 public:
   Assignment_StmtAST(ExprAST *LHS, ExprAST *RHS) : LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-  Value *codegen() override;
-  void TypeCheck();
+  virtual Value *codegen() override;
+  virtual void TypeCheck() override;
 };
 
 // ⟨compound-stmt⟩
@@ -282,7 +295,7 @@ public:
            std::vector<ExprAST *> Args)
       : Callee(Callee), Args(std::move(Args)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  virtual Type *getT() override;
 };
 
 // “if” '(' ⟨cond⟩ ')' ⟨stmt⟩ [ “else” ⟨stmt⟩ ]
@@ -314,7 +327,7 @@ public:
   ExprAST *expr;
   Return_Stmt(ExprAST *expr) : expr(expr) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  virtual void TypeCheck() override;
 };
 
 /* ------------------------------------------- Function ------------------------------------------- */
@@ -345,11 +358,6 @@ public:
       else
         argTypes.push_back((*it).second);
     }
-
-    // for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it) {
-    //     argTypes.push_back((*it).second->getAllocatedType());
-    // }
-    // argTypes.push_back(PointerType::getUnqual(Type::getInt16Ty(getGlobalContext())));
     return argTypes;
   };
 };
@@ -401,7 +409,7 @@ class WriteInteger : public StmtAST
 public:
   WriteInteger(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // virtual Type *getT() override;
 };
 
 class WriteByte : public StmtAST
@@ -411,7 +419,7 @@ class WriteByte : public StmtAST
 public:
   WriteByte(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // virtual Type* getT() override;
 };
 
 class WriteChar : public StmtAST
@@ -421,7 +429,7 @@ class WriteChar : public StmtAST
 public:
   WriteChar(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // virtual Type* getT() override;
 };
 
 class WriteString : public StmtAST
@@ -431,7 +439,7 @@ class WriteString : public StmtAST
 public:
   WriteString(ExprAST *str) : str(std::move(str)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // virtual Type* getT() override;
 };
 
 class ReadInteger : public ExprAST
@@ -458,10 +466,10 @@ public:
 class ReadString : public StmtAST
 {
   ExprAST *expr;
-  Id_ExprAST* array;
+  Id_ExprAST *array;
 
 public:
-  ReadString(ExprAST *expr, Id_ExprAST* array) : expr(std::move(expr)), array(std::move(array)) {}
+  ReadString(ExprAST *expr, Id_ExprAST *array) : expr(std::move(expr)), array(std::move(array)) {}
   virtual Value *codegen() override;
 };
 
@@ -472,7 +480,7 @@ class Extend : public ExprAST
 public:
   Extend(ExprAST *expr) : expr(std::move(expr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
 
 class Shrink : public ExprAST
@@ -482,7 +490,7 @@ class Shrink : public ExprAST
 public:
   Shrink(ExprAST *expr) : expr(std::move(expr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
 
 class Strlen : public ExprAST
@@ -492,7 +500,7 @@ class Strlen : public ExprAST
 public:
   Strlen(ExprAST *Arr) : Arr(std::move(Arr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
 
 class Strcpy : public StmtAST
@@ -501,9 +509,9 @@ class Strcpy : public StmtAST
   ExprAST *RArr;
 
 public:
-  Strcpy(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  Strcpy(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
 
 class Strcmp : public ExprAST
@@ -512,9 +520,9 @@ class Strcmp : public ExprAST
   ExprAST *RArr;
 
 public:
-  Strcmp(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  Strcmp(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
 
 class Strcat : public StmtAST
@@ -523,12 +531,10 @@ class Strcat : public StmtAST
   ExprAST *RArr;
 
 public:
-  Strcat(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
+  Strcat(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
   virtual Value *codegen() override;
-  void TypeCheck();
+  // void getT();
 };
-
-
 
 void llvm_compile_and_dump(FunctionAST *t);
 
