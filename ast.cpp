@@ -34,6 +34,7 @@ static Function *TheStrcpy;
 static Function *TheStrcat;
 
 // Useful LLVM types.
+static Type *i1 = IntegerType::get(TheContext, 1);
 static Type *i8 = IntegerType::get(TheContext, 8);
 static Type *i16 = IntegerType::get(TheContext, 16);
 static Type *i32 = IntegerType::get(TheContext, 32);
@@ -255,7 +256,7 @@ Value *Id_ExprAST::codegen()
         indexList.push_back(c16(0));
         LoadInst *ldinst = Builder.CreateLoad(V, Name);
         GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
-        // return Builder.CreateLoad(gepInst, Name);
+        return Builder.CreateLoad(gepInst, Name);
         return gepInst;
       }
       else if (ArrayType::classof(V->getAllocatedType()))
@@ -282,6 +283,7 @@ Value *Id_ExprAST::codegen()
 Value *ArrayElement_ExprAST::codegen()
 {
   // myfile << "<id>[<expr>]: " << Name << "[" << dyn_cast<ConstantInt>(getExpr())->getSExtValue() << "]" << std::endl;
+  TypeCheck();
 
   AllocaInst *arr = context.locals()[Name];
   Value *index = expr->codegen();
@@ -311,6 +313,17 @@ Value *ArrayElement_ExprAST::codegen()
   }
 }
 
+void ArrayElement_ExprAST::TypeCheck()
+{
+  Value *index = expr->codegen();
+  if (!(index->getType()->isIntegerTy(16)))
+  {
+    LogErrorV("\nIndex of array must be of int type\n");
+    exit(1);
+  }
+  return;
+}
+
 // IR for string-literal
 Value *StringLiteral_ExprAST::codegen()
 {
@@ -338,6 +351,8 @@ Value *StringLiteral_ExprAST::codegen()
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
 Value *ArithmeticOp_ExprAST::codegen()
 {
+  TypeCheck();
+
   Value *L = LHS->codegen();
   Value *R = RHS->codegen();
   if (!L || !R)
@@ -359,11 +374,28 @@ Value *ArithmeticOp_ExprAST::codegen()
   }
 }
 
+void ArithmeticOp_ExprAST::TypeCheck()
+{
+  if (!Unary)
+  {
+    Value *L = LHS->codegen();
+    Value *R = RHS->codegen();
+    if ((L->getType()) != (R->getType()))
+    {
+      LogErrorV("\noperands of arithmetic operation must be of same type\n");
+      exit(1);
+    }
+  }
+  return;
+}
+
 /* ------------------------------------------- IR for CondAST ------------------------------------------- */
 
 // IR for ⟨expr⟩( '==' | '!=' | '<' | '>' | '<=' | '>=' )⟨expr⟩
 Value *ComparisonOp_CondAST::codegen()
 {
+  TypeCheck();
+
   Value *l = LHS->codegen();
   Value *r = RHS->codegen();
   if (!l || !r)
@@ -385,6 +417,20 @@ Value *ComparisonOp_CondAST::codegen()
   default:
     return LogErrorV("invalid binary operator");
   }
+}
+
+void ComparisonOp_CondAST::TypeCheck()
+{
+
+  Value *L = LHS->codegen();
+  Value *R = RHS->codegen();
+  if ((L->getType()) != (R->getType()))
+  {
+    LogErrorV("\noperands of comparison operation must be of same type\n");
+    exit(1);
+  }
+
+  return;
 }
 
 // IR for ⟨cond⟩ ( '&' | '|' ) ⟨cond⟩
@@ -416,6 +462,8 @@ Value *LogicalOp_CondAST::codegen()
 // IR for ⟨l-value⟩ '=' ⟨expr⟩
 Value *Assignment_StmtAST::codegen()
 {
+  TypeCheck();
+
   // myfile << "⟨l-value⟩ '=' ⟨expr⟩: \t";
   Value *Val = RHS->codegen();
   if (!Val)
@@ -442,6 +490,8 @@ Value *Assignment_StmtAST::codegen()
       }
       else
       {
+        // identifier found!
+        //in function
         if (PointerType::classof(Variable->getAllocatedType()))
         {
           Value *index = c16(0);
@@ -450,8 +500,10 @@ Value *Assignment_StmtAST::codegen()
           GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(Variable->getAllocatedType()->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), LHSE->getName(), context.currentBlock());
           Builder.CreateStore(Val, gepInst);
         }
+        // array
         else if (ArrayType::classof(Variable->getAllocatedType()))
         {
+          // assign string
           StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(RHS);
           if (str)
           {
@@ -476,6 +528,7 @@ Value *Assignment_StmtAST::codegen()
             }
           }
         }
+        // id
         else
         {
           Builder.CreateStore(Val, Variable);
@@ -522,6 +575,67 @@ Value *Assignment_StmtAST::codegen()
     } while (block != NULL);
   }
   return Val;
+}
+
+void Assignment_StmtAST::TypeCheck()
+{
+  Value *L = LHS->codegen();
+  Value *R = RHS->codegen();
+
+  Type *LT = L->getType();
+  Type *RT = R->getType();
+
+  if (PointerType::classof(L->getType()))
+  {
+    LogErrorV("\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa\n");
+  }
+
+  if (L->getType()->isIntegerTy(16))
+    LogErrorV("\nLeft is 16\n");
+  else if (L->getType()->isIntegerTy(8))
+    LogErrorV("\nLeft is 8\n");
+
+  if (R->getType()->isIntegerTy(16))
+    LogErrorV("\nRight is 16\n");
+  else if (R->getType()->isIntegerTy(8))
+    LogErrorV("\nRight is 8\n");
+
+  if (LT->isPointerTy())
+    LT = LT->getPointerElementType(); //getPointerElementType()
+
+  if (RT->isPointerTy())
+    RT = RT->getPointerElementType(); //getPointerElementType()
+
+  if (LT->isPointerTy() && LT->getPointerElementType()->isArrayTy() )
+    LT = LT->getPointerElementType()->getArrayElementType(); //getPointerElementType()
+
+  if (RT->isPointerTy() && RT->getPointerElementType()->isArrayTy() )
+    RT = RT->getPointerElementType()->getArrayElementType(); //getPointerElementType()
+
+
+  if (LT->isArrayTy())
+    LT = LT->getArrayElementType();
+
+  if (RT->isArrayTy())
+    RT = RT->getArrayElementType();
+
+  // if (L->getType()->isIntegerTy(16))
+  //   LogErrorV("\nLeft is 16\n");
+  // else if (L->getType()->isIntegerTy(8))
+  //   LogErrorV("\nLeft is 8\n");
+
+  // if (R->getType()->isIntegerTy(16))
+  //   LogErrorV("Right is 16\n");
+  // else if (R->getType()->isIntegerTy(8))
+  //   LogErrorV("Right is 8\n");
+
+  if (!(LT->isIntegerTy(16) && (RT->isIntegerTy(16))) && !(LT->isIntegerTy(8) && (RT->isIntegerTy(8))))
+  {
+    LogErrorV("\noperands of assignement operation must be of same type\n");
+    exit(1);
+  }
+
+  return;
 }
 
 // IR for ⟨compound-stmt⟩

@@ -110,7 +110,7 @@ typedef enum
 
 typedef enum
 {
-  PLUS,
+  PLUS = '+',
   MINUS,
   TIMES,
   DIV,
@@ -191,6 +191,7 @@ public:
   virtual Value *codegen() override;
   const std::string &getName() const { return Name; }
   Value *getExpr() { return expr->codegen(); }
+  void TypeCheck();
 };
 
 //TODO: string literal
@@ -210,10 +211,12 @@ class ArithmeticOp_ExprAST : public ExprAST
   ExprAST *LHS;
   arithmetic_ops Op;
   ExprAST *RHS;
+  bool Unary;
 
 public:
-  ArithmeticOp_ExprAST(ExprAST *LHS, arithmetic_ops op, ExprAST *RHS) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)) {}
+  ArithmeticOp_ExprAST(ExprAST *LHS, arithmetic_ops op, ExprAST *RHS, bool Unary) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)), Unary(std::move(Unary)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 /* ------------------------------------------- CondAST ------------------------------------------- */
@@ -228,6 +231,7 @@ class ComparisonOp_CondAST : public CondAST
 public:
   ComparisonOp_CondAST(ExprAST *LHS, comparison_ops op, ExprAST *RHS) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 // ⟨cond⟩ ( '&' | '|' ) ⟨cond⟩
@@ -254,6 +258,7 @@ class Assignment_StmtAST : public StmtAST
 public:
   Assignment_StmtAST(ExprAST *LHS, ExprAST *RHS) : LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   Value *codegen() override;
+  void TypeCheck();
 };
 
 // ⟨compound-stmt⟩
@@ -277,6 +282,7 @@ public:
            std::vector<ExprAST *> Args)
       : Callee(Callee), Args(std::move(Args)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 // “if” '(' ⟨cond⟩ ')' ⟨stmt⟩ [ “else” ⟨stmt⟩ ]
@@ -308,6 +314,7 @@ public:
   ExprAST *expr;
   Return_Stmt(ExprAST *expr) : expr(expr) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 /* ------------------------------------------- Function ------------------------------------------- */
@@ -394,6 +401,7 @@ class WriteInteger : public StmtAST
 public:
   WriteInteger(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class WriteByte : public StmtAST
@@ -403,16 +411,17 @@ class WriteByte : public StmtAST
 public:
   WriteByte(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class WriteChar : public StmtAST
 {
   ExprAST *p;
-  // char p;
 
 public:
   WriteChar(ExprAST *p) : p(std::move(p)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class WriteString : public StmtAST
@@ -422,6 +431,7 @@ class WriteString : public StmtAST
 public:
   WriteString(ExprAST *str) : str(std::move(str)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class ReadInteger : public ExprAST
@@ -462,6 +472,7 @@ class Extend : public ExprAST
 public:
   Extend(ExprAST *expr) : expr(std::move(expr)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class Shrink : public ExprAST
@@ -471,6 +482,7 @@ class Shrink : public ExprAST
 public:
   Shrink(ExprAST *expr) : expr(std::move(expr)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class Strlen : public ExprAST
@@ -480,6 +492,7 @@ class Strlen : public ExprAST
 public:
   Strlen(ExprAST *Arr) : Arr(std::move(Arr)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class Strcpy : public StmtAST
@@ -490,6 +503,7 @@ class Strcpy : public StmtAST
 public:
   Strcpy(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class Strcmp : public ExprAST
@@ -500,6 +514,7 @@ class Strcmp : public ExprAST
 public:
   Strcmp(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 class Strcat : public StmtAST
@@ -510,6 +525,7 @@ class Strcat : public StmtAST
 public:
   Strcat(ExprAST *LArr, ExprAST *RArr ) : LArr(std::move(LArr)), RArr(std::move(RArr) ) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 

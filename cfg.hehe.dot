@@ -1,0 +1,5 @@
+digraph "CFG for 'hehe' function" {
+	label="CFG for 'hehe' function";
+
+	Node0x13e9790 [shape=record,label="{entry:\l  %z7 = alloca i16*\l  %y6 = alloca i8*\l  %x5 = alloca i16*\l  %e4 = alloca [100 x i8]*\l  %c3 = alloca [100 x i8]*\l  %b2 = alloca [100 x i16]*\l  %a1 = alloca [100 x i16]*\l  store [100 x i16]* %a, [100 x i16]** %a1\l  store [100 x i16]* %b, [100 x i16]** %b2\l  store [100 x i8]* %c, [100 x i8]** %c3\l  store [100 x i8]* %e, [100 x i8]** %e4\l  store i16* %x, i16** %x5\l  store i8* %y, i8** %y6\l  store i16* %z, i16** %z7\l  ret i16 5\l}"];
+}

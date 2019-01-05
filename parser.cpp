@@ -1743,43 +1743,43 @@ yyreduce:
 
   case 53:
 #line 218 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), PLUS, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), PLUS, (yyvsp[0].expr), 0); }
 #line 1748 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 54:
 #line 219 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), MINUS, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), MINUS, (yyvsp[0].expr), 0); }
 #line 1754 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 55:
 #line 220 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), TIMES, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), TIMES, (yyvsp[0].expr), 0); }
 #line 1760 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 56:
 #line 221 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), DIV, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), DIV, (yyvsp[0].expr), 0); }
 #line 1766 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 57:
 #line 222 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), MOD, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST((yyvsp[-2].expr), MOD, (yyvsp[0].expr), 0); }
 #line 1772 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 58:
 #line 223 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, (yyvsp[0].expr), 1); }
 #line 1778 "parser.cpp" /* yacc.c:1646  */
     break;
 
   case 59:
 #line 224 "parser.y" /* yacc.c:1646  */
-    { (yyval.expr) = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, (yyvsp[0].expr)); }
+    { (yyval.expr) = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, (yyvsp[0].expr), 1); }
 #line 1784 "parser.cpp" /* yacc.c:1646  */
     break;
 

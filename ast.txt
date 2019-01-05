@@ -1,5 +1,34 @@
 New function: main
+	New function: hehe
 
-	Inherited: 0
+		Inherited: 0
 
-	Locals: 0
+		Locals: 7
+		a   0x2a17d98
+		b   0x2a17ea8
+		c   0x2a17fb8
+		e   0x2a180c8
+		x   0x2a181d8
+		y   0x2a18408
+		z   0x2a184f8
+
+Calling function: hehe
+
+	Inherited: 1
+	hehe
+	a   0x2a095e0
+	b   0x2a095e0
+	c   0x2a09600
+	e   0x2a09600
+	x   0x2a09620
+	y   0x2a09640
+	z   0x2a09620
+
+	Locals: 7
+	a   0x2a16638
+	b   0x2a16d68
+	c   0x2a16e48
+	e   0x2a171c8
+	x   0x2a16f28
+	y   0x2a17008
+	z   0x2a170e8

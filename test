@@ -1,6 +1,31 @@
 main () : proc
-{
-    writeString("dadas\n");
-
-    return;
-}
+    a : int[100];
+    b : int[100];
+    c : byte[100];
+    x: int;
+    y: byte;
+    z: int;
+    e: byte[100];
+    hehe( ): int
+        {
+            
+            a[10] = 2;
+            --x = a[0];
+            x = x;
+            writeInteger(a[0]);
+            --writeByte(c);
+            return 5;
+        }
+    
+    {
+        c = "adasfad";
+        --writeByte(c);
+        a[1000] = 3;
+        a[0] = 1;
+        writeInteger(a[0]);
+        hehe();
+        --y = c;
+        writeInteger(x);
+        --writeString(c);
+        return;
+    }

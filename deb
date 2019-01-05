@@ -1,0 +1,34 @@
+rm: cannot remove 'minibasic': No such file or directory
+rm: cannot remove 'a.out': No such file or directory
+rm: cannot remove 'a.s': No such file or directory
+lexer.cpp: In function ‘int yy_get_next_buffer()’:
+lexer.cpp:1461:44: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+  if ((int) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+                                            ^
+lexer.cpp: At global scope:
+lexer.cpp:1537:17: warning: ‘void yyunput(int, char*)’ defined but not used [-Wunused-function]
+     static void yyunput (int c, char * yy_bp )
+                 ^
+ast.cpp:37:14: warning: ‘i1’ defined but not used [-Wunused-variable]
+ static Type *i1 = IntegerType::get(TheContext, 1);
+              ^
+Error: 
+Left is 16
+
+Error: 
+Right is 16
+
+Error: 
+operands of assignement operation must be of same type
+
+llc: Unknown command line argument '-L'.  Try: 'llc -help'
+llc: Did you mean '-I'?
+llc: Too many positional arguments specified!
+Can specify at most 1 positional arguments: See: llc -help
+clang: error: no such file or directory: 'a.s'
+WARNING: You're attempting to print out a bitcode file.
+This is inadvisable as it may cause display problems. If
+you REALLY want to taste LLVM bitcode first-hand, you
+can force output with the `-f' option.
+
+do.sh: 13: do.sh: ./a.out: not found
