@@ -41,6 +41,11 @@ static Type *i32 = IntegerType::get(TheContext, 32);
 // static Type *i64 = IntegerType::get(TheContext, 64);
 
 // Useful LLVM helper functions.
+inline ConstantInt *c1(char c)
+{
+  return ConstantInt::get(TheContext, APInt(1, c, true));
+}
+
 inline ConstantInt *c8(char c)
 {
   return ConstantInt::get(TheContext, APInt(8, c, true));
@@ -238,7 +243,7 @@ Value *IntConst_ExprAST::codegen()
 
 Type *IntConst_ExprAST::getT()
 {
-  return i16;
+  return IntegerType::get(TheContext, 16);
 }
 
 // IR for <char-const>
@@ -271,7 +276,7 @@ Value *Id_ExprAST::codegen()
     indexList.push_back(c16(0));
     indexList.push_back(c16(0));
     LoadInst *ldinst = Builder.CreateLoad(V, Name);
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType()->getPointerElementType()), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType()->getPointerElementType()), ldinst, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
     return gepInst;
   }
   else if (PointerType::classof(V->getAllocatedType()))
@@ -280,7 +285,7 @@ Value *Id_ExprAST::codegen()
     std::vector<Value *> indexList;
     indexList.push_back(c16(0));
     LoadInst *ldinst = Builder.CreateLoad(V, Name);
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
     // return Builder.CreateLoad(gepInst, Name);
     return gepInst;
   }
@@ -290,7 +295,7 @@ Value *Id_ExprAST::codegen()
     std::vector<Value *> indexList;
     indexList.push_back(c8(0));
     indexList.push_back(c8(0));
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType(), V, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
     return gepInst;
   }
   else
@@ -403,6 +408,14 @@ Value *ArithmeticOp_ExprAST::codegen()
   case MINUS:
     return Builder.CreateSub(L, R, "subtmp");
   case TIMES:
+    if (L->getType()->isIntegerTy(16))
+    {
+      LogErrorV("L iS 16!!");
+    }
+    if (R->getType()->isIntegerTy(16))
+    {
+      LogErrorV("R iS 16!!");
+    }
     return Builder.CreateMul(L, R, "multmp");
   case DIV:
     return Builder.CreateUDiv(L, R, "modtmp");
@@ -448,7 +461,7 @@ Value *ComparisonOp_CondAST::codegen()
   switch (Op)
   {
   case L:
-    return Builder.CreateICmpSLT(l, r, "ltmp");
+    return Builder.CreateICmpSLT(c1(1), c1(0), "ltmp");
   case G:
     return Builder.CreateICmpSGT(l, r, "gtmp");
   case LE:
@@ -470,11 +483,11 @@ void ComparisonOp_CondAST::TypeCheck()
   Value *R = RHS->codegen();
   L = loadValue(L);
   R = loadValue(R);
-  if ((L->getType()) != (R->getType()))
-  {
-    LogErrorV("\noperands of comparison operation must be of same type\n");
-    exit(1);
-  }
+  // if ((L->getType()) != (R->getType()))
+  // {
+  //   LogErrorV("\noperands of comparison operation must be of same type\n");
+  //   exit(1);
+  // }
   return;
 }
 
@@ -511,7 +524,7 @@ Value *LogicalOp_CondAST::codegen()
 // IR for ⟨l-value⟩ '=' ⟨expr⟩
 Value *Assignment_StmtAST::codegen()
 {
-  TypeCheck();
+  // TypeCheck();
 
   // evaluate r-value
   Value *Val = RHS->codegen();
@@ -529,23 +542,23 @@ Value *Assignment_StmtAST::codegen()
 
 void Assignment_StmtAST::TypeCheck()
 {
-  Value *L = LHS->codegen();
-  Value *R = RHS->codegen();
+  // Value *L = LHS->codegen();
+  // Value *R = RHS->codegen();
 
-  Type *LT = L->getType();
-  Type *RT = R->getType();
+  // Type *LT = L->getType();
+  // Type *RT = R->getType();
 
-  if (LT->isPointerTy())
-    LT = LT->getPointerElementType();
+  // if (LT->isPointerTy())
+  //   LT = LT->getPointerElementType();
 
-  if (RT->isPointerTy())
-    RT = RT->getPointerElementType();
+  // if (RT->isPointerTy())
+  //   RT = RT->getPointerElementType();
 
-  if (!(LT->isIntegerTy(16) && (RT->isIntegerTy(16))) && !(LT->isIntegerTy(8) && (RT->isIntegerTy(8))))
-  {
-    LogErrorV("\noperands of assignement operation must be of same type\n");
-    exit(1);
-  }
+  // if (!(LT->isIntegerTy(16) && (RT->isIntegerTy(16))) && !(LT->isIntegerTy(8) && (RT->isIntegerTy(8))))
+  // {
+  //   LogErrorV("\noperands of assignement operation must be of same type\n");
+  //   exit(1);
+  // }
   return;
 }
 
@@ -667,19 +680,15 @@ Value *If_StmtAST::codegen()
 
   Builder.SetInsertPoint(ThenBB);
   Value *ThenV = Then->codegen();
-  if (!ThenV) 
+  if (!ThenV)
     return nullptr;
 
   // Builder.SetInsertPoint(ThenBB);
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateBr(MergeBB);
 
-  // ThenBB = Builder.GetInsertBlock();
-
   TheFunction->getBasicBlockList().push_back(ElseBB);
-  // context.pushBlock(ElseBB, nullptr);
   Builder.SetInsertPoint(ElseBB);
-  // Builder.SetInsertPoint(context.currentBlock());
 
   Value *ElseV = nullptr;
   if (Else != nullptr)
@@ -688,80 +697,27 @@ Value *If_StmtAST::codegen()
     if (!ElseV)
       return nullptr;
   }
-//?
-  // Builder.SetInsertPoint(ElseBB);
 
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateBr(MergeBB);
-  // ElseBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder.SetInsertPoint(MergeBB);
 
-
-  // context.pushBlock(MergeBB, nullptr);
-  // Builder.SetInsertPoint(MergeBB);
-  // Builder.SetInsertPoint(MergeBB);
   return c32(0);
-
-  // Value *CondV = Cond->codegen();
-  // if (!CondV)
-  //   return nullptr;
-
-  // CondV = Builder.CreateICmpNE(CondV, c32(0), "ifcond");
-
-  // Function *TheFunction = Builder.GetInsertBlock()->getParent(); //must fix
-
-  // BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
-  // context.pushBlock(ThenBB, nullptr);
-  // BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
-  // BasicBlock *MergeBB = BasicBlock::Create(TheContext, "ifcont");
-
-  // Builder.CreateCondBr(CondV, ThenBB, ElseBB);
-
-  // // Builder.SetInsertPoint(ThenBB);
-  // Builder.SetInsertPoint(context.currentBlock());
-  // Value *ThenV = Then->codegen();
-
-  // if (!ThenV) 
-  //   return nullptr;
-
-  // if (!Builder.GetInsertBlock()->getTerminator())
-  //   Builder.CreateBr(MergeBB);
-
-  // ThenBB = Builder.GetInsertBlock();
-
-  // TheFunction->getBasicBlockList().push_back(ElseBB);
-  // context.pushBlock(ElseBB, nullptr);
-  // // Builder.SetInsertPoint(ElseBB);
-  // Builder.SetInsertPoint(context.currentBlock());
-
-  // Value *ElseV = nullptr;
-  // if (Else != nullptr)
-  // {
-  //   ElseV = Else->codegen();
-  //   if (!ElseV)
-  //     return nullptr;
-  // }
-
-  // if (!Builder.GetInsertBlock()->getTerminator())
-  //   Builder.CreateBr(MergeBB);
-  // ElseBB = Builder.GetInsertBlock();
-
-  // TheFunction->getBasicBlockList().push_back(MergeBB);
-  // context.pushBlock(MergeBB, nullptr);
-  // // Builder.SetInsertPoint(MergeBB);
-  // Builder.SetInsertPoint(context.currentBlock());
-  // return c32(0);
 }
 
 // IR for “while” '(' ⟨cond⟩ ')' ⟨stmt⟩
 Value *While_StmtAST::codegen()
 {
   Value *CondV = Cond->codegen();
+  if (CondV->getType()->isIntegerTy(1))
+  {
+    LogErrorV("CONDV IS 1");
+  }
   if (!CondV)
     return nullptr;
-  CondV = Builder.CreateICmpNE(CondV, c32(0), "while_entry");
+  CondV = Builder.CreateICmpNE(CondV, c1(0), "while_entry");
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
   BasicBlock *WhileBB = BasicBlock::Create(TheContext, "while", TheFunction);
@@ -776,13 +732,18 @@ Value *While_StmtAST::codegen()
     return nullptr;
 
   Value *WhileV = Cond->codegen();
+  if (CondV->getType()->isIntegerTy(1))
+  {
+    LogErrorV("WHILEV IS I1");
+  }
+
   if (!WhileV)
     return nullptr;
-  WhileV = Builder.CreateICmpNE(WhileV, c32(0), "while_entry");
+  WhileV = Builder.CreateICmpNE(WhileV, c1(0), "while_entry");
 
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateCondBr(WhileV, WhileBB, MergeBB);
-  WhileBB = Builder.GetInsertBlock();
+  // WhileBB = Builder.GetInsertBlock();
 
   TheFunction->getBasicBlockList().push_back(MergeBB);
   Builder.SetInsertPoint(MergeBB);
@@ -793,35 +754,40 @@ Value *While_StmtAST::codegen()
 // IR for “return” [ ⟨expr⟩ ]
 Value *Return_Stmt::codegen()
 {
-  // TypeCheck();
+  TypeCheck();
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     return c32(0);
   }
+
   Value *returnValue = expr->codegen();
   returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
+  ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
   // std::cout << " return  " <<  context.id << std::endl;
   return returnValue;
 }
 
 void Return_Stmt::TypeCheck()
 {
-  if (expr == NULL )
+  Type *ret = context.getTop()->getFunction()->getFunctionType()->getReturnType();
+
+  if (!expr)
   {
-    LogErrorV("NUUUUUUUUUUL");
-    // if (!context.getTop()->getFunction()->getFunctionType()->getReturnType()->isVoidTy())
-    // {
-    //   LogErrorV("Return type of function differs from defined type");
-    //   exit(1);
-    // }
+    if (!ret->isVoidTy())
+    {
+      LogErrorV("Return type of function doesn't match definition type which is void");
+      exit(1);
+    }
   }
-  else if (expr->getT() != context.getTop()->getFunction()->getFunctionType()->getReturnType())
+  else if (!(ret->isIntegerTy(16) && expr->getT()->isIntegerTy(16)) && !(ret->isIntegerTy(8) && expr->getT()->isIntegerTy(8)))
   {
-    LogErrorV("Return type of function differs from defined type");
+    LogErrorV("Return type of function doesn't match definition type ");
     exit(1);
   }
+  return;
 }
 
 /* ------------------------------------------- IR for Function ------------------------------------------- */
@@ -878,7 +844,6 @@ Value *FuncBody_AST::codegen()
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
     {
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
-      Builder.SetInsertPoint(context.currentBlock());
       /* save var defs so far */
       for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
       {
@@ -944,36 +909,36 @@ Function *FunctionAST::codegen()
 
   if (Body->codegen())
   {
-    myfile << "\n";
-    for (int i = 0; i < context.id; i++)
-      myfile << "\t";
-    myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
-    for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
-    {
-      for (int i = 0; i < context.id; i++)
-        myfile << "\t";
-      myfile << i->first << std::endl;
-      for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
-      {
-        for (int i = 0; i < context.id; i++)
-          myfile << "\t";
-        myfile << (it->first) << "   " << (it->second) << std::endl;
-      }
-    }
-    myfile << "\n";
-    for (int i = 0; i < context.id; i++)
-      myfile << "\t";
-    myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
+    // myfile << "\n";
+    // for (int i = 0; i < context.id; i++)
+    //   myfile << "\t";
+    // myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
+    // for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
+    // {
+    //   for (int i = 0; i < context.id; i++)
+    //     myfile << "\t";
+    //   myfile << i->first << std::endl;
+    //   for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
+    //   {
+    //     for (int i = 0; i < context.id; i++)
+    //       myfile << "\t";
+    //     myfile << (it->first) << "   " << (it->second) << std::endl;
+    //   }
+    // }
+    // myfile << "\n";
+    // for (int i = 0; i < context.id; i++)
+    //   myfile << "\t";
+    // myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
 
-    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
-    {
-      for (int i = 0; i < context.id; i++)
-        myfile << "\t";
-      myfile << (it->first) << "   " << (it->second) << std::endl;
-    }
+    // for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+    // {
+    //   for (int i = 0; i < context.id; i++)
+    //     myfile << "\t";
+    //   myfile << (it->first) << "   " << (it->second) << std::endl;
+    // }
 
     // Finish off the function.
-    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
+    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     context.popBlock();
 
     // Validate the generated code, checking for consistency.
