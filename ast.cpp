@@ -219,10 +219,11 @@ Value *LogErrorV(const char *Str)
 Value *loadValue(Value *p)
 {
   if (PointerType::classof(p->getType()))
-   {
+  {
     LogErrorV("POINTER FOUND MMMMMMMMM");
     // return Builder.CreateAlignedLoad(p, 4);
-    return Builder.CreateLoad(p, "var");}
+    return Builder.CreateLoad(p, "var");
+  }
   else
     return p;
 }
@@ -240,20 +241,7 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
 // IR for <int-const>
 Value *IntConst_ExprAST::codegen()
 {
-  // Function *TheFunction = Builder.GetInsertBlock()->getParent();
-  AllocaInst *V = context.locals()["CONST"];
-
-  Builder.CreateStore(c16(Val), V);
-  return V;
-
-  // std::vector<Value *> indexList;
-  // indexList.push_back(c16(0));
-  // LoadInst *ldinst = Builder.CreateLoad(V, "int_const");
-  // GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType()->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), "int_const", Builder.GetInsertBlock());
-  // Builder.CreateStore(c16(Val), gepInst);
-  // return gepInst;
-  // myfile << "<int-const>: ";
-  // return c16(Val);
+  return c16(Val);
 }
 
 Type *IntConst_ExprAST::getT()
@@ -413,10 +401,13 @@ Value *ArithmeticOp_ExprAST::codegen()
   if (!L || !R)
     return nullptr;
 
-  L = loadValue(L);
-  R = loadValue(R);
+  Value * temp1 = loadValue(L);
+  Value * temp2 = loadValue(R);
 
-  switch (Op)
+  L = temp1;
+  R = temp2;
+
+    switch (Op)
   {
   case PLUS:
     return Builder.CreateAdd(L, R, "addtmp");
@@ -476,7 +467,7 @@ Value *ComparisonOp_CondAST::codegen()
   switch (Op)
   {
   case L:
-    return Builder.CreateICmpSLT(c1(1), c1(0), "ltmp");
+    return Builder.CreateICmpSLT(l, r, "ltmp");
   case G:
     return Builder.CreateICmpSGT(l, r, "gtmp");
   case LE:
@@ -838,9 +829,6 @@ Value *FuncBody_AST::codegen()
 {
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
-
-  AllocaInst *V = CreateEntryBlockAlloca(TheFunction, "CONST", i16);
-  context.locals()["CONST"] = V;
 
   // <local-def>
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i)
