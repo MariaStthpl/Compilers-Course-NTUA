@@ -1,0 +1,5 @@
+digraph "CFG for 'g' function" {
+	label="CFG for 'g' function";
+
+	Node0x223c0d0 [shape=record,label="{entry:\l  call void @f.1()\l  ret void\l}"];
+}

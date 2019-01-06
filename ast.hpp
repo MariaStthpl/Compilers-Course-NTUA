@@ -21,6 +21,11 @@
 
 using namespace llvm;
 
+static LLVMContext TheContext;
+static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<Module> TheModule;
+
+
 class CodeGenBlock
 {
   int id;
@@ -31,11 +36,21 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
   std::map<std::string, AllocaInst *> locals;
+  std::map<std::string, Value *> local_functions;
   std::map<std::string, Type *> locals_type;
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
+
+  std::map<std::string, std::vector<std::pair<std::string, Value *>>> funs;
+
+
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
   std::map<std::string, Type *> &getLocals_Types() { return locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
+
+  std::map<std::string, Value *> &getLocal_functions() { return local_functions; }
+  std::map<std::string, std::vector<std::pair<std::string, Value *>>> &getFuns() { return funs; }
+
+
   void setId(int n) { id = n; }
   int getId() { return id; }
   Function *getFunction() { return fun; }
@@ -53,6 +68,10 @@ public:
   std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
   std::map<std::string, Type *> &locals_type() { return blocks.top()->locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return blocks.top()->inherited; }
+
+  std::map<std::string, Value *> &local_functions() { return blocks.top()->local_functions; }
+  std::map<std::string, std::vector<std::pair<std::string, Value *>>> &funs() { return blocks.top()->funs; }
+
   BasicBlock *currentBlock() { return blocks.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
   {

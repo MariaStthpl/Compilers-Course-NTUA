@@ -11,4 +11,10 @@ if [ "$1" != "" ]; then
     clang a.s lib.a -o a.out
     opt -dot-cfg a.ll
     ./a.out
+
+    # clang++
+    # clang-3.8
+    # clang++-3.8 
+    # clang-5.0
+    # clang++-5.0
 fi

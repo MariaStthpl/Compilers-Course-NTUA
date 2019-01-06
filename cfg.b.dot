@@ -1,0 +1,5 @@
+digraph "CFG for 'b' function" {
+	label="CFG for 'b' function";
+
+	Node0xc55040 [shape=record,label="{entry:\l  call void @writeInteger(i16 4)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  ret void\l}"];
+}

@@ -1,0 +1,5 @@
+digraph "CFG for 'f.1' function" {
+	label="CFG for 'f.1' function";
+
+	Node0x223c450 [shape=record,label="{entry:\l  %string = alloca [4 x i8]\l  %str = getelementptr inbounds [4 x i8], [4 x i8]* %string, i8 0, i8 0\l  store i8 52, i8* %str\l  %str1 = getelementptr inbounds [4 x i8], [4 x i8]* %string, i8 0, i8 1\l  store i8 50, i8* %str1\l  %str2 = getelementptr inbounds [4 x i8], [4 x i8]* %string, i8 0, i8 2\l  store i8 10, i8* %str2\l  %str3 = getelementptr inbounds [4 x i8], [4 x i8]* %string, i8 0, i8 3\l  store i8 0, i8* %str3\l  %str_ptr = getelementptr inbounds [4 x i8], [4 x i8]* %string, i8 0, i8 0\l  call void @writeString(i8* %str_ptr)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  ret void\l}"];
+}

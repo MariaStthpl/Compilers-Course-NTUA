@@ -13,7 +13,7 @@ using namespace std;
 
 void yyerror (const char *msg);
 
-string *fixEscapeChars (char* stringToFix) {
+string *fixEscapeChars (char* stringToFix, char mode) {
     std::string *temp = new std::string(stringToFix);
 
     // ofstream stdfile;
@@ -24,7 +24,7 @@ string *fixEscapeChars (char* stringToFix) {
     // stdfile << "WTF" << endl;
     // stdfile << regex_replace (s,e,"sub-$2");
     // // std::cout << std::regex_replace ("",(x([0-9]|[A-Fa-f])([0-9]|[A-Fa-f]) ),temp);
-    
+    // std::cout << temp->length() << std::endl;
     int counter = 0;
     for(int i=0; stringToFix[i]!='\0'; i++ ) {
         char c[2] ;
@@ -46,6 +46,11 @@ string *fixEscapeChars (char* stringToFix) {
                 case '0':
                     c[0] = '\0'; 
                     (*temp).replace(i - counter++,2, c);
+                     //null is considered as end of string and not included in it so can't return it, so we manually return the ascii value of null
+                     if (mode == 'c')  {
+                             (*temp)[1] = 0;
+                             return temp;
+                     }
                     break;
                 case '\\':
                     c[0] = '\\';
@@ -83,7 +88,6 @@ string *fixEscapeChars (char* stringToFix) {
             }
         }
     }
-    
     return temp;
 }
 
@@ -141,11 +145,11 @@ CC ([^'\"\\]|{ES})
 "=="				    { return EQ_OP; }
 "!="				    { return NEQ_OP; }
 
-'{CC}'                  { string *tempC = fixEscapeChars(yytext); yylval.c = (*tempC)[1]; return T_CHAR_CONST; }
+'{CC}'                  { string *tempC = fixEscapeChars(yytext, 'c'); yylval.c = (*tempC)[1]; return T_CHAR_CONST; }
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = yytext; return T_NAME; return T_STRING; } */
     /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; return T_STRING; } */
 
-\"([^'\"\\\n]|{ES})*\"  { yylval.s = fixEscapeChars(yytext); return T_STRING; }
+\"([^'\"\\\n]|{ES})*\"  { yylval.s = fixEscapeChars(yytext, 's'); return T_STRING; }
 
     /* {L}({D}|{L}|_)*         { yylval.s = yytext; return T_NAME; } */
     /* {L}({D}|{L}|_)*         { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; } */

@@ -4,6 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/usr/include/llvm-3.8",
                 "/usr/include/llvm-6.0",
                 "/usr/include/llvm-5.0",
                 "/usr/include/llvm-c-5.0"

@@ -1,0 +1,10 @@
+digraph "CFG for 'fact.1' function" {
+	label="CFG for 'fact.1' function";
+
+	Node0xd25d40 [shape=record,label="{entry:\l  %cast = bitcast i16 %n to i16\l  %eqtmp = icmp eq i16 %cast, 0\l  %ifcond = icmp ne i1 %eqtmp, false\l  br i1 %ifcond, label %then, label %else\l|{<s0>T|<s1>F}}"];
+	Node0xd25d40:s0 -> Node0xd25f30;
+	Node0xd25d40:s1 -> Node0xd25fa0;
+	Node0xd25f30 [shape=record,label="{then:                                             \l  ret i16 1\l}"];
+	Node0xd25fa0 [shape=record,label="{else:                                             \l  %cast6 = bitcast i16 %n to i16\l  %subtmp = sub i16 %cast6, 1\l  %0 = call i16 @fact.1(i16 %subtmp)\l  %cast8 = bitcast i16 %n to i16\l  %cast9 = bitcast i16 %0 to i16\l  %multmp = mul i16 %cast8, %cast9\l  ret i16 %multmp\l}"];
+	Node0xd26500 [shape=record,label="{ifcont:                                           \l  ret i16 %multmp\l}"];
+}

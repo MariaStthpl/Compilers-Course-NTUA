@@ -158,13 +158,13 @@ var_type:
 ;
 
 data_type:
-  TINT                                { $$ = Type::getInt16Ty(getGlobalContext()); }
-| TBYTE                               { $$ = Type::getInt8Ty(getGlobalContext()); }
+  TINT                                { $$ = Type::getInt16Ty(TheContext); }
+| TBYTE                               { $$ = Type::getInt8Ty(TheContext); }
 ;
 
 r_type:
   data_type                           { $$ = $1; }
-| "proc"                               { $$ = Type::getVoidTy(getGlobalContext()); }
+| "proc"                              { $$ = Type::getVoidTy(TheContext); }
 ;
 
 compound_stmt:

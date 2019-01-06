@@ -9,9 +9,10 @@ using namespace llvm;
 std::ofstream myfile;
 
 // Global LLVM variables related to the LLVM suite.
-static LLVMContext TheContext;
-static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule;
+// static LLVMContext TheContext;
+// //= Context::getGlobalContex;
+// static IRBuilder<> Builder(TheContext);
+// static std::unique_ptr<Module> TheModule;
 // static std::map<std::string, Value *> NamedValues;
 // static std::map<std::string, AllocaInst *> NamedValues;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
@@ -34,7 +35,7 @@ static Function *TheStrcpy;
 static Function *TheStrcat;
 
 // Useful LLVM types.
-static Type *i1 = IntegerType::get(TheContext, 1);
+// static Type *i1 = IntegerType::get(TheContext, 1);
 static Type *i8 = IntegerType::get(TheContext, 8);
 static Type *i16 = IntegerType::get(TheContext, 16);
 static Type *i32 = IntegerType::get(TheContext, 32);
@@ -70,6 +71,12 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
   TheFPM->add(createPromoteMemoryToRegisterPass());
   // TODO optimizations
+  // TheFPM->add(createGVNPass());
+  // TheFPM->add(createCFGSimplificationPass());
+  // TheFPM->add(createDeadCodeEliminationPass());
+  // TheFPM->add(createDeadInstEliminationPass());
+  // for (int i = 0; i < 5; ++i)
+  //   TheFPM->add(createDeadStoreEliminationPass());
   // TheFPM->add(createInstructionCombiningPass());
   // TheFPM->add(createReassociatePass());
   // TheFPM->add(createGVNPass());
@@ -174,11 +181,12 @@ void llvm_compile_and_dump(FunctionAST *t)
                        "strcat", TheModule.get());
 
   // Define and start the main function.
+  Function *main_function;
   t->codegen();
   if (t->Proto->getName() != "main")
   {
     auto fun = TheModule->getFunction("main");
-    auto main_function = TheModule->getFunction(t->Proto->getName());
+    main_function = TheModule->getFunction(t->Proto->getName());
     if (fun != NULL)
       fun->setName("_oldmain");
     main_function->setName("main");
@@ -193,7 +201,7 @@ void llvm_compile_and_dump(FunctionAST *t)
     TheModule->print(outs(), nullptr);
     return;
   }
-  // TheFPM->run(*main);
+  TheFPM->run(*main_function);
   // Print out the IR.
   TheModule->print(outs(), nullptr);
 }
@@ -216,16 +224,34 @@ Value *LogErrorV(const char *Str)
   return nullptr;
 }
 
-Value *loadValue(Value *p)
+Value *casting(Value *p)
 {
   if (PointerType::classof(p->getType()))
   {
-    LogErrorV("POINTER FOUND MMMMMMMMM");
-    // return Builder.CreateAlignedLoad(p, 4);
-    return Builder.CreateLoad(p, "var");
+    Type *tempT = p->getType()->getPointerElementType();
+    if (tempT->isIntegerTy(8))
+      return Builder.CreatePointerCast(p, PointerType::getUnqual(i8), "cast");
+    else if (tempT->isIntegerTy(16))
+      return Builder.CreatePointerCast(p, PointerType::getUnqual(i16), "cast");
   }
   else
-    return p;
+  {
+    Type *tempT = p->getType();
+    if (tempT->isIntegerTy(8))
+      return Builder.CreateIntCast(p, i8, 0, "cast");
+    else if (tempT->isIntegerTy(16))
+      return Builder.CreateIntCast(p, i16, 1, "cast");
+  }
+  return p;
+}
+
+Value *loadValue(Value *p)
+{
+  if (PointerType::classof(p->getType()))
+    return casting(Builder.CreateLoad(p, "var"));
+  else
+    return casting(p);
+  return p;
 }
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of the function.  This is used for mutable variables etc.
@@ -330,7 +356,7 @@ Value *ArrayElement_ExprAST::codegen()
     indexList.push_back(c32(0));
     indexList.push_back(index);
     LoadInst *ldinst = Builder.CreateLoad(arr, Name);
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((arr->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
     // return Builder.CreateLoad(gepInst, Name);
     return gepInst;
   }
@@ -341,7 +367,7 @@ Value *ArrayElement_ExprAST::codegen()
     indexList.push_back(c32(0));
     indexList.push_back(index);
     // Builder.CreateLoad(arr, Name); // needed?
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(arr->getAllocatedType(), arr, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
     // return Builder.CreateLoad(gepInst, Name);
     return gepInst;
   }
@@ -374,17 +400,17 @@ Value *StringLiteral_ExprAST::codegen()
   for (i = 1; i < string_literal.length() - 1; i++)
   {
     indexList.push_back(c8(i - 1));
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", context.currentBlock());
+    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", Builder.GetInsertBlock());
     Builder.CreateStore(c8(string_literal[i]), gepInst);
     indexList.pop_back();
   }
   indexList.push_back(c8(i - 1));
-  GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", context.currentBlock());
+  GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", Builder.GetInsertBlock());
   Builder.CreateStore(c8(0), gepInst);
   indexList.pop_back();
 
   indexList.push_back(c8(0));
-  gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str_ptr", context.currentBlock());
+  gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str_ptr", Builder.GetInsertBlock());
   return gepInst;
 }
 
@@ -401,13 +427,13 @@ Value *ArithmeticOp_ExprAST::codegen()
   if (!L || !R)
     return nullptr;
 
-  Value * temp1 = loadValue(L);
-  Value * temp2 = loadValue(R);
+  Value *temp1 = loadValue(L);
+  Value *temp2 = loadValue(R);
 
   L = temp1;
   R = temp2;
 
-    switch (Op)
+  switch (Op)
   {
   case PLUS:
     return Builder.CreateAdd(L, R, "addtmp");
@@ -463,6 +489,20 @@ Value *ComparisonOp_CondAST::codegen()
 
   l = loadValue(l);
   r = loadValue(r);
+
+  // std::string type_str;
+  // raw_string_ostream rso(type_str);
+  // r->print(rso);
+  // myfile<<rso.str();//prrr
+
+  // Value *nl = Builder.CreateZExtOrTrunc(r, i8, "ext");
+  // l = Builder.CreateIntCast(l, i16, 1, "left_cast");
+  // r = Builder.CreateIntCast(r, i16, 1, "right_cast");
+
+  // l = Builder.CreateZExtOrTrunc(l, i16, "ext");
+  // r = Builder.CreateZExtOrTrunc(r, i16, "ext");
+  if (l->getType() == r->getType())
+    LogErrorV("SAMME COMPARISON TYPES KKKK");
 
   switch (Op)
   {
@@ -542,6 +582,7 @@ Value *Assignment_StmtAST::codegen()
 
   // l-value is always a pointer
   Value *V = LHS->codegen();
+  V = casting(V);
 
   return Builder.CreateStore(Val, V);
 }
@@ -587,26 +628,31 @@ Value *FuncCall::codegen()
 {
   myfile << "\nCalling function: " << Callee << std::endl;
   // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(Callee);
+  Function *CalleeF = cast<Function>(context.local_functions()[Callee]); //TheModule->getFunction(Callee);
   if (!CalleeF)
     return LogErrorV("Unknown function referenced");
 
   // If argument mismatch error. Except the real parameters, we take into consideration the # pointers of previous variables' declaration
   if (CalleeF->arg_size() != (Args.size() + (context.getTop()->inherited[Callee]).size()))
-    return LogErrorV("Incorrect # arguments passed");
+  {
+    LogErrorV("Incorrect # arguments passed");
+    exit(1);
+  }
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
   {
-    // check argument pass by reference
+    // check if argument pass by reference
     if (PointerType::classof(FTy->getParamType(i)))
     {
+      //string-literal
       if (dynamic_cast<StringLiteral_ExprAST *>(Args[i]) != nullptr)
       {
         StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(Args[i]);
         ArgsV.push_back(str->codegen());
       }
+      //id
       else if (dynamic_cast<Id_ExprAST *>(Args[i]) != nullptr)
       {
         myfile << std::endl
@@ -621,21 +667,25 @@ Value *FuncCall::codegen()
           std::vector<Value *> indexList;
           indexList.push_back(c16(0));
           indexList.push_back(c16(0));
-          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock());
+          GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), Builder.GetInsertBlock());
           ArgsV.push_back(gepInst);
+        }
+        else if (PointerType::classof(V->getType()))
+        {
+          ArgsV.push_back(Args[i]->codegen());
         }
         else
         {
           std::vector<Value *> indexList;
           indexList.push_back(c16(0));
-          ArgsV.push_back(GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), context.currentBlock()));
+          ArgsV.push_back(GetElementPtrInst::CreateInBounds(V->getType(), V, ArrayRef<Value *>(indexList), temp->getName(), Builder.GetInsertBlock()));
         }
         if (!V)
           LogErrorV("Unknown variable name");
       }
     }
     else
-      ArgsV.push_back(Args[i]->codegen());
+      ArgsV.push_back(loadValue(Args[i]->codegen()));
     if (!ArgsV.back())
       return nullptr;
   }
@@ -646,7 +696,7 @@ Value *FuncCall::codegen()
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, context.currentBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
       ArgsV.push_back(ldinst);
     }
@@ -654,11 +704,11 @@ Value *FuncCall::codegen()
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, context.currentBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
   }
-  return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+  return Builder.CreateCall(CalleeF, ArgsV); // "calltmp"
 }
 
 Type *FuncCall::getT()
@@ -674,9 +724,9 @@ Value *If_StmtAST::codegen()
   if (!CondV)
     return nullptr;
 
-  CondV = Builder.CreateICmpNE(CondV, c32(0), "ifcond");
+  CondV = Builder.CreateICmpNE(CondV, c1(0), "ifcond");
 
-  Function *TheFunction = Builder.GetInsertBlock()->getParent(); //must fix
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
   BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
   BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else");
@@ -717,12 +767,16 @@ Value *If_StmtAST::codegen()
 Value *While_StmtAST::codegen()
 {
   Value *CondV = Cond->codegen();
+
   if (CondV->getType()->isIntegerTy(1))
   {
     LogErrorV("CONDV IS 1");
   }
   if (!CondV)
     return nullptr;
+
+  if (CondV->getType() == c1(0)->getType())
+    LogErrorV("CONDITION DAAAAMN");
   CondV = Builder.CreateICmpNE(CondV, c1(0), "while_entry");
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
@@ -745,6 +799,14 @@ Value *While_StmtAST::codegen()
 
   if (!WhileV)
     return nullptr;
+
+  //   std::string type_str;
+  // raw_string_ostream rso(type_str);
+  // WhileV->print(rso);
+  // myfile<<rso.str();//prrrr
+  if (WhileV->getType() == c1(0)->getType())
+    LogErrorV("DAAAAAAMN");
+
   WhileV = Builder.CreateICmpNE(WhileV, c1(0), "while_entry");
 
   if (!Builder.GetInsertBlock()->getTerminator())
@@ -764,15 +826,23 @@ Value *Return_Stmt::codegen()
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
+    // if (!Builder.GetInsertBlock()->getTerminator())
+    // Builder.CreateRetVoid();
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
+
+    // Function *TheFunction = Builder.GetInsertBlock()->getParent();
+    // BasicBlock *BB = BasicBlock::Create(TheContext, "return", TheFunction);
+    // Builder.SetInsertPoint(BB);
     return c32(0);
   }
 
   Value *returnValue = expr->codegen();
   returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
+
+  // Builder.CreateRet(context.getCurrentReturnValue());
   ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-  // std::cout << " return  " <<  context.id << std::endl;
+
   return returnValue;
 }
 
@@ -857,13 +927,27 @@ Value *FuncBody_AST::codegen()
       {
         context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(it->second->getAllocatedType())));
       }
-      temp->codegen();
+
+      // for (std::map<std::string, Value *>::iterator it = (context.getTop()->getLocal_functions()).begin(); it != (context.getTop()->getLocal_functions()).end(); ++it)
+      // {
+      //   context.funs()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Value *>(it->first, it->second));
+      // }
+
+      Function *fun = temp->codegen();
+      context.local_functions()[(temp->Proto->getName())] = fun;
+
       Builder.SetInsertPoint(context.currentBlock());
     }
   }
 
   Builder.SetInsertPoint(context.currentBlock());
   Value *BodyVal = Body->codegen();
+  // Function *f = cast<Function>(context.local_functions()[(temp->Proto->getName())]);
+  // if (!f)
+  //   LogErrorV("AAAAAAAAAAAAAAAAAAAAAAAAAAA");
+  std::vector<Value *> ArgsV;
+  // Builder.CreateCall(f, ArgsV); // "calltmp"
+  // Function *ff = context.getFunction();
   if (!BodyVal)
     return nullptr;
 
@@ -876,14 +960,14 @@ Function *FunctionAST::codegen()
   // First, check for an existing function from a previous 'extern' declaration.
   Function *TheFunction = TheModule->getFunction(Proto->getName());
 
-  if (!TheFunction)
+  // if (!TheFunction)
     TheFunction = Proto->codegen();
 
-  if (!TheFunction)
-    return nullptr;
+  // if (!TheFunction)
+  //   return nullptr;
 
-  if (!TheFunction->empty())
-    return (Function *)LogErrorV("Function cannot be redefined.");
+  // if (!TheFunction->empty())
+  //   return (Function *)LogErrorV("Function cannot be redefined.");
 
   for (int i = 0; i < context.id; i++)
     myfile << "\t";
@@ -895,13 +979,17 @@ Function *FunctionAST::codegen()
   if (context.id > 0)
     prev = context.getTop();
   context.pushBlock(BB, TheFunction);
+  // if (context.id > 0) // main can call itself?
   context.setPrev(prev);
   Builder.SetInsertPoint(context.currentBlock());
 
   if (context.id > 1)
   {
-    context.locals() = prev->getLocals();
+    context.inherited() = prev->getInherited();
+    context.local_functions() = prev->getLocal_functions();
+    // context.locals() = prev->getLocals();
     context.locals_type() = prev->getLocals_Types();
+    context.local_functions()[Proto->getName()] = TheFunction; //pushes itself on local definitions
   }
 
   // Record the function arguments in the NamedValues map.
@@ -918,47 +1006,64 @@ Function *FunctionAST::codegen()
 
   if (Value *Val = Body->codegen())
   {
-    // myfile << "\n";
-    // for (int i = 0; i < context.id; i++)
-    //   myfile << "\t";
-    // myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
-    // for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
-    // {
-    //   for (int i = 0; i < context.id; i++)
-    //     myfile << "\t";
-    //   myfile << i->first << std::endl;
-    //   for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
-    //   {
-    //     for (int i = 0; i < context.id; i++)
-    //       myfile << "\t";
-    //     myfile << (it->first) << "   " << (it->second) << std::endl;
-    //   }
-    // }
-    // myfile << "\n";
-    // for (int i = 0; i < context.id; i++)
-    //   myfile << "\t";
-    // myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
 
-    // for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
-    // {
-    //   for (int i = 0; i < context.id; i++)
-    //     myfile << "\t";
-    //   myfile << (it->first) << "   " << (it->second) << std::endl;
-    // }
+    myfile << "\n";
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Inherited: " << context.getTop()->getInherited().size() << std::endl;
+    for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << i->first << std::endl;
+      for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
+      {
+        for (int i = 0; i < context.id; i++)
+          myfile << "\t";
+        myfile << (it->first) << "   " << (it->second) << std::endl;
+      }
+    }
+    myfile << "\n";
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
+
+    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << (it->first) << "   " << (it->second) << std::endl;
+    }
+
+    myfile << "\n";
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << "Local Functions: " << context.getTop()->getLocals().size() << std::endl;
+
+    for (std::map<std::string, Value *>::iterator it = (context.getTop()->getLocal_functions()).begin(); it != (context.getTop()->getLocal_functions()).end(); ++it)
+    {
+      for (int i = 0; i < context.id; i++)
+        myfile << "\t";
+      myfile << (it->first) << std::endl;
+    }
 
     // Finish off the function.
-    // ReturnInst::Create(TheContext, Val, Builder.GetInsertBlock());
+    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
+    Builder.CreateRet(context.getCurrentReturnValue());
     context.popBlock();
 
     // Validate the generated code, checking for consistency.
     verifyFunction(*TheFunction);
+    TheFPM->run(*TheFunction);
     return TheFunction;
   }
   else
   {
-    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
+    Builder.CreateRetVoid();
+    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     context.popBlock();
     verifyFunction(*TheFunction);
+    TheFPM->run(*TheFunction);
     return TheFunction;
   }
 

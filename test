@@ -1,31 +1,30 @@
 main () : proc
-    a : int[100];
-    b : int[100];
-    c : byte[100];
-    x: int;
-    y: byte;
-    z: int;
-    e: byte[100];
-    hehe( ): int
-        {
-            
-            a[10] = 2;
-            --x = a[0];
-            x = x;
-            writeInteger(a[0]);
-            --writeByte(c);
-            return 5;
-        }
-    
-    {
-        c = "adasfad";
-        --writeByte(c);
-        a[1000] = 3;
-        a[0] = 1;
-        writeInteger(a[0]);
-        hehe();
-        --y = c;
-        writeInteger(x);
-        --writeString(c);
-        return;
-    }
+
+   length (s : reference byte []) : int
+      i : int;
+   {
+      i=0;
+      while (s[i] != '\0')
+         i=i+1;
+      return i;
+   }
+
+   reverse (s : reference byte [], r : reference byte []) : proc
+      i : int;
+      l : int;
+   {
+      l = length(s);
+      i = 0;
+      while (i < l) {
+         r[i] = s[l-i-1];
+         i=i+1;
+      }
+      r[i] = '\0';
+   }
+
+   p : byte [20];
+
+{
+   reverse("\n!dlrow olleH", p);
+   writeString(p);
+}
