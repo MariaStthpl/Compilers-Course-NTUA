@@ -219,7 +219,10 @@ Value *LogErrorV(const char *Str)
 Value *loadValue(Value *p)
 {
   if (PointerType::classof(p->getType()))
-    return Builder.CreateLoad(p);
+   {
+    LogErrorV("POINTER FOUND MMMMMMMMM");
+    // return Builder.CreateAlignedLoad(p, 4);
+    return Builder.CreateLoad(p, "var");}
   else
     return p;
 }
@@ -237,8 +240,20 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
 // IR for <int-const>
 Value *IntConst_ExprAST::codegen()
 {
+  // Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  AllocaInst *V = context.locals()["CONST"];
+
+  Builder.CreateStore(c16(Val), V);
+  return V;
+
+  // std::vector<Value *> indexList;
+  // indexList.push_back(c16(0));
+  // LoadInst *ldinst = Builder.CreateLoad(V, "int_const");
+  // GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(V->getAllocatedType()->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), "int_const", Builder.GetInsertBlock());
+  // Builder.CreateStore(c16(Val), gepInst);
+  // return gepInst;
   // myfile << "<int-const>: ";
-  return c16(Val);
+  // return c16(Val);
 }
 
 Type *IntConst_ExprAST::getT()
@@ -346,7 +361,7 @@ Value *ArrayElement_ExprAST::codegen()
 
 Type *ArrayElement_ExprAST::getT()
 {
-  TypeCheck();
+  // TypeCheck();
   return context.locals_type()[Name];
 }
 
@@ -408,14 +423,14 @@ Value *ArithmeticOp_ExprAST::codegen()
   case MINUS:
     return Builder.CreateSub(L, R, "subtmp");
   case TIMES:
-    if (L->getType()->isIntegerTy(16))
-    {
-      LogErrorV("L iS 16!!");
-    }
-    if (R->getType()->isIntegerTy(16))
-    {
-      LogErrorV("R iS 16!!");
-    }
+    // if (L->getType()->isIntegerTy(16))
+    // {
+    //   LogErrorV("L iS 16!!");
+    // }
+    // if (R->getType()->isIntegerTy(16))
+    // {
+    //   LogErrorV("R iS 16!!");
+    // }
     return Builder.CreateMul(L, R, "multmp");
   case DIV:
     return Builder.CreateUDiv(L, R, "modtmp");
@@ -448,7 +463,7 @@ Type *ArithmeticOp_ExprAST::getT()
 // IR for ⟨expr⟩( '==' | '!=' | '<' | '>' | '<=' | '>=' )⟨expr⟩
 Value *ComparisonOp_CondAST::codegen()
 {
-  TypeCheck();
+  // TypeCheck();
 
   Value *l = LHS->codegen();
   Value *r = RHS->codegen();
@@ -754,7 +769,7 @@ Value *While_StmtAST::codegen()
 // IR for “return” [ ⟨expr⟩ ]
 Value *Return_Stmt::codegen()
 {
-  TypeCheck();
+  // TypeCheck();
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
@@ -824,6 +839,9 @@ Value *FuncBody_AST::codegen()
 
   Function *TheFunction = Builder.GetInsertBlock()->getParent();
 
+  AllocaInst *V = CreateEntryBlockAlloca(TheFunction, "CONST", i16);
+  context.locals()["CONST"] = V;
+
   // <local-def>
   for (unsigned i = 0, e = VarNames.size(); i != e; ++i)
   {
@@ -845,11 +863,14 @@ Value *FuncBody_AST::codegen()
     {
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
       /* save var defs so far */
+      Builder.SetInsertPoint(context.currentBlock());
+
       for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
       {
         context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(it->second->getAllocatedType())));
       }
       temp->codegen();
+      Builder.SetInsertPoint(context.currentBlock());
     }
   }
 
@@ -907,7 +928,7 @@ Function *FunctionAST::codegen()
     context.locals_type()[Arg.getName()] = Arg.getType();
   }
 
-  if (Body->codegen())
+  if (Value *Val = Body->codegen())
   {
     // myfile << "\n";
     // for (int i = 0; i < context.id; i++)
@@ -938,7 +959,7 @@ Function *FunctionAST::codegen()
     // }
 
     // Finish off the function.
-    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
+    // ReturnInst::Create(TheContext, Val, Builder.GetInsertBlock());
     context.popBlock();
 
     // Validate the generated code, checking for consistency.
