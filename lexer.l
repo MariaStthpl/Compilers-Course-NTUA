@@ -138,7 +138,7 @@ CC ([^'\"\\]|{ES})
 {D}+                    { yylval.n = atoi(yytext); return T_INT_CONST; }
 \n                      { linenumber++;  /* ignore new lines */ }
 {W}+                    { /* ignore other white space */ }
-"--".*["\\r\\\n"]*      { printf("COMMENT\n"); } /* TODO: must create new %x state to count number of new lines */
+"--".*                  { printf("COMMENT\n"); } /* TODO: must create new %x state to count number of new lines */
 "(*"                    { comm_num++; BEGIN(COMMENT); }
 <COMMENT>"(*"           { comm_num++;}
 <COMMENT>\n             { linenumber++; }
