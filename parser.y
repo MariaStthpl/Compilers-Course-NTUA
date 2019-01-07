@@ -48,7 +48,6 @@ FunctionAST *t;
 %token TWHILE "while"
 %token TRETURN "return"
 %token TPROC "proc"
-%token T_print "print"
 %token TTRUE "true"
 %token TFALSE "false"
 %token EQ_OP "=="

@@ -121,9 +121,7 @@ CC ([^'\"\\]|{ES})
 "strlen"                { return T_STRLEN; }
 "strcmp"                { return T_STRCMP; }
 "strcpy"                { return T_STRCPY; }
-"strcat"                { return T_STRCAT; }                
-
-"print"                 { return T_print; }
+"strcat"                { return T_STRCAT; }
 
 [-=+*/%!&|<>]           { return yytext[0]; }
 [()}{,:;]               { return yytext[0]; }
@@ -135,30 +133,18 @@ CC ([^'\"\\]|{ES})
 "!="				    { return NEQ_OP; }
 
 '{CC}'                  { string *tempC = fixEscapeChars(yytext, 'c'); yylval.c = (*tempC)[1]; return T_CHAR_CONST; }
-    /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = yytext; return T_NAME; return T_STRING; } */
-    /* \"([^'\"\\\n]|{ES})*\"  { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; return T_STRING; } */
-
 \"([^'\"\\\n]|{ES})*\"  { yylval.s = fixEscapeChars(yytext, 's'); return T_STRING; }
-
-    /* {L}({D}|{L}|_)*         { yylval.s = yytext; return T_NAME; } */
-    /* {L}({D}|{L}|_)*         { yylval.s = (char *) new(strlen(yytext) + 1); strcpy((char *) ( yylval.s), yytext); return T_NAME; } */
 {L}({D}|{L}|_)*         { yylval.s = new std::string(yytext); return T_id; }
 {D}+                    { yylval.n = atoi(yytext); return T_INT_CONST; }
-
 \n                      { linenumber++;  /* ignore new lines */ }
 {W}+                    { /* ignore other white space */ }
-
-"--".*\n                { printf("COMMENT\n"); }
-
+"--".*["\\r\\\n"]*      { printf("COMMENT\n"); } /* TODO: must create new %x state to count number of new lines */
 "(*"                    { comm_num++; BEGIN(COMMENT); }
-
 <COMMENT>"(*"           { comm_num++;}
 <COMMENT>\n             { linenumber++; }
 <COMMENT>"*)"           { if (--comm_num == 0) { printf("COMMENT\n"); BEGIN(INITIAL); } }
 <COMMENT>"*"            { /* nothing */ }
 <COMMENT>"("            { /* nothing */ }
 <COMMENT>[^*(\n]+       { /* nothing */ }
-
 .                       { yyerror("illegal character"); }
-
 %%
