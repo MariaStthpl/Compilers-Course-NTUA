@@ -753,23 +753,25 @@ Value *Return_Stmt::codegen()
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
-    // if (!Builder.GetInsertBlock()->getTerminator())
-    // Builder.CreateRetVoid();
     ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
 
-    // Function *TheFunction = Builder.GetInsertBlock()->getParent();
-    // BasicBlock *BB = BasicBlock::Create(TheContext, "return", TheFunction);
-    // Builder.SetInsertPoint(BB);
+    Function *TheFunction = Builder.GetInsertBlock()->getParent();
+    BasicBlock *BB = BasicBlock::Create(TheContext, "return");
+    if (!Builder.GetInsertBlock()->getTerminator())
+      Builder.CreateBr(BB);
+    Builder.SetInsertPoint(BB);
     return c32(0);
   }
 
   Value *returnValue = expr->codegen();
   returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
-
-  // Builder.CreateRet(context.getCurrentReturnValue());
   ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-
+  Function *TheFunction = Builder.GetInsertBlock()->getParent();
+  BasicBlock *BB = BasicBlock::Create(TheContext, "return");
+  if (!Builder.GetInsertBlock()->getTerminator())
+    Builder.CreateBr(BB);
+  Builder.SetInsertPoint(BB);
   return returnValue;
 }
 
@@ -925,7 +927,7 @@ Function *FunctionAST::codegen()
     context.locals_type()[Arg.getName()] = Arg.getType();
   }
 
-  if (Value *Val = Body->codegen())
+  if (Body->codegen())
   {
 
     myfile << "\n";
@@ -970,20 +972,11 @@ Function *FunctionAST::codegen()
     myfile << "\n";
 
     // Finish off the function.
-    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-    Builder.CreateRet(context.getCurrentReturnValue());
+    if (!Builder.GetInsertBlock()->getTerminator())
+      Builder.CreateRet(context.getCurrentReturnValue());
     context.popBlock();
 
     // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
-    TheFPM->run(*TheFunction);
-    return TheFunction;
-  }
-  else
-  {
-    Builder.CreateRetVoid();
-    // ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-    context.popBlock();
     verifyFunction(*TheFunction);
     TheFPM->run(*TheFunction);
     return TheFunction;
