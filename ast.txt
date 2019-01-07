@@ -1,2 +1,61 @@
 New function: main
-	New function: length
+	New function: newline
+
+		Childs: 2
+		newline
+		writeString
+
+		Locals: 0
+
+		Local Functions: 9
+		newline - newline
+		readByte - readByte
+		readChar - readChar
+		readInteger - readInteger
+		readString - readString
+		writeByte - writeByte
+		writeChar - writeChar
+		writeInteger - writeInteger
+		writeString - writeString
+
+	New function: writeString
+
+		Childs: 3
+		newline
+		writeInteger
+		writeString
+
+		Locals: 1
+		i   0x1f2a1f8
+
+		Local Functions: 9
+		newline - newline
+		readByte - readByte
+		readChar - readChar
+		readInteger - readInteger
+		readString - readString
+		writeByte - writeByte
+		writeChar - writeChar
+		writeInteger - writeInteger
+		writeString - writeString.1
+
+
+	Childs: 3
+	newline
+	writeInteger
+	writeString
+
+	Locals: 1
+	writeInteger   0x1f2a1f8
+
+	Local Functions: 9
+	newline - newline
+	readByte - readByte
+	readChar - readChar
+	readInteger - readInteger
+	readString - readString
+	writeByte - writeByte
+	writeChar - writeChar
+	writeInteger - writeInteger
+	writeString - writeString.1
+

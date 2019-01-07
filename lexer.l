@@ -115,17 +115,6 @@ CC ([^'\"\\]|{ES})
 "return"                { return TRETURN; }
 "while"                 { return TWHILE; }
 
-
-"writeInteger"          { return TW_INT; }
-"writeByte"             { return TW_BYTE; }
-"writeChar"             { return TW_CHAR; }
-"writeString"           { return TW_STRING; }
-
-"readInteger"           { return TR_INT; }
-"readByte"              { return TR_BYTE; }
-"readChar"              { return TR_CHAR; }
-"readString"            { return TR_STRING; }
-
 "extend"                { return T_EXNTEND; }
 "shrink"                { return T_SHRINK; }
 

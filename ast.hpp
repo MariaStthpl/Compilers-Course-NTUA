@@ -36,7 +36,7 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
   std::map<std::string, AllocaInst *> locals;
-  std::map<std::string, Value *> local_functions;
+  std::map<std::string, std::pair<std::string, Value *>> local_functions;
   std::map<std::string, Type *> locals_type;
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
 
@@ -47,7 +47,7 @@ public:
   std::map<std::string, Type *> &getLocals_Types() { return locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
 
-  std::map<std::string, Value *> &getLocal_functions() { return local_functions; }
+  std::map<std::string, std::pair<std::string, Value *>> &getLocal_functions() { return local_functions; }
   std::map<std::string, std::vector<std::pair<std::string, Value *>>> &getFuns() { return funs; }
 
 
@@ -69,7 +69,7 @@ public:
   std::map<std::string, Type *> &locals_type() { return blocks.top()->locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return blocks.top()->inherited; }
 
-  std::map<std::string, Value *> &local_functions() { return blocks.top()->local_functions; }
+  std::map<std::string, std::pair<std::string, Value *>> &local_functions() { return blocks.top()->local_functions; }
   std::map<std::string, std::vector<std::pair<std::string, Value *>>> &funs() { return blocks.top()->funs; }
 
   BasicBlock *currentBlock() { return blocks.top()->block; }

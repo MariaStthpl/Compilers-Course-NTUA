@@ -1,6 +1,0 @@
-digraph "CFG for 'inc' function" {
-	label="CFG for 'inc' function";
-
-	Node0x169f3f0 [shape=record,label="{entry:\l  %cast = bitcast i16 %x to i16\l  call void @writeInteger(i16 %cast)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  %cast5 = bitcast i16 %x to i16\l  %addtmp = add i16 %cast5, 1\l  ret i16 %addtmp\l}"];
-	Node0x169f840 [shape=record,label="{%0:                                                  \l  ret i16 %addtmp\l}"];
-}

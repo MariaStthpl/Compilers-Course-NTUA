@@ -1,5 +1,0 @@
-digraph "CFG for 'main' function" {
-	label="CFG for 'main' function";
-
-	Node0x22399b0 [shape=record,label="{entry:\l  call void @g()\l  ret void\l}"];
-}

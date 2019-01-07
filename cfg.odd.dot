@@ -1,6 +1,0 @@
-digraph "CFG for 'odd' function" {
-	label="CFG for 'odd' function";
-
-	Node0x169fbb0 [shape=record,label="{entry:\l  %cast = bitcast i16 %x to i16\l  call void @writeInteger(i16 %cast)\l  call void @writeString(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @nl,\l... i32 0, i32 0))\l  %cast5 = bitcast i16 %x to i16\l  %modtmp = urem i16 %cast5, 2\l  %ext = trunc i16 %modtmp to i8\l  ret i8 %ext\l}"];
-	Node0x16a0080 [shape=record,label="{%0:                                                  \l  ret i8 %ext\l}"];
-}
