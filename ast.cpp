@@ -357,18 +357,17 @@ Type *Id_ExprAST::getT()
     exit(1);
   }
 
-  Type *idT = (context.symbol_table()[Name].second)->getType();
+  Type *idT = (context.symbol_table()[Name].second)->getType()->getPointerElementType();
+  // return idT->getPointerElementType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
-      return idT->getPointerElementType()->getArrayElementType();
-    else if (PointerType::classof(idT->getPointerElementType()))
-      return idT->getPointerElementType()->getPointerElementType();
+      return idT->getPointerElementType();
     else
       return idT->getPointerElementType();
   }
   else if (ArrayType::classof(idT))
-    return idT->getArrayElementType();
+    return idT;
   else
     return idT;
 }
@@ -428,9 +427,6 @@ Type *ArrayElement_ExprAST::getT()
   {
     if (ArrayType::classof(idT->getPointerElementType()))
       return idT->getPointerElementType()->getArrayElementType();
-    else if (PointerType::classof(idT->getPointerElementType()))
-
-      return (idT->getPointerElementType())->getPointerElementType();
     else
       return idT->getPointerElementType();
   }
@@ -482,7 +478,7 @@ Value *StringLiteral_ExprAST::codegen()
 
 Type *StringLiteral_ExprAST::getT()
 {
-  return i8;
+  return PointerType::getUnqual(i8);
 }
 
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
@@ -767,12 +763,27 @@ void FuncCall::TypeCheck()
     exit(1);
   }
 
-  // TODO check if arguments of func call are the same type with function's arguments
-  // FunctionType *FTy = CalleeF->getFunctionType();
-  // for (unsigned i = 0, e = Args.size(); i != e; ++i)
-  // {
-  //   if ( FTY->getParamType(i) !=  )
-  // }
+  FunctionType *FTy = CalleeF->getFunctionType();
+  for (unsigned i = 0, e = Args.size(); i != e; ++i)
+  {
+    myfile << " ARG " << std::endl;
+    if (PointerType::classof(FTy->getParamType(i)))
+    {
+      if (!dynamic_cast<Id_ExprAST *>(Args[i]) && !dynamic_cast<StringLiteral_ExprAST *>(Args[i]))
+      {
+        LogError("Calling function with wrong argument type, arg no: " + std::to_string(i + 1));
+        exit(1);
+      }
+    }
+    else
+    {
+      if (Args[i]->getT() != FTy->getParamType(i))
+      {
+        LogError("Calling function with wrong argument type, arg no: " + std::to_string(i + 1));
+        exit(1);
+      }
+    }
+  }
   return;
 }
 
