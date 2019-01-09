@@ -64,7 +64,7 @@ void llvm_compile_and_dump(FunctionAST *t)
   // Initialize the module and the optimization passes.
   TheModule = make_unique<Module>("alan program", TheContext);
   TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
-  TheFPM->add(createPromoteMemoryToRegisterPass());
+  // TheFPM->add(createPromoteMemoryToRegisterPass());
   // TODO optimizations
   // TheFPM->add(createGVNPass());
   // TheFPM->add(createCFGSimplificationPass());
@@ -304,7 +304,7 @@ Type *CharConst_ExprAST::getT()
 Value *Id_ExprAST::codegen()
 {
   // Look this variable up in the function.
-  AllocaInst *V = context.locals()[Name];
+  AllocaInst *V = cast<AllocaInst>(context.symbol_table()[Name].second);
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
@@ -350,14 +350,14 @@ Value *Id_ExprAST::codegen()
 
 Type *Id_ExprAST::getT()
 {
-  Value *V = context.locals()[Name];
+  Value *V = context.symbol_table()[Name].second;
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
     exit(1);
   }
 
-  Type *idT = context.locals()[Name]->getType();
+  Type *idT = (context.symbol_table()[Name].second)->getType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
@@ -377,7 +377,7 @@ Type *Id_ExprAST::getT()
 Value *ArrayElement_ExprAST::codegen()
 {
 
-  AllocaInst *arr = context.locals()[Name];
+  AllocaInst *arr = cast<AllocaInst>(context.symbol_table()[Name].second);
   if (!arr)
   {
     LogError("Unknown array name: " + Name);
@@ -423,7 +423,7 @@ Value *ArrayElement_ExprAST::codegen()
 Type *ArrayElement_ExprAST::getT()
 {
   TypeCheck();
-  Type *idT = context.locals()[Name]->getType()->getPointerElementType();
+  Type *idT = (context.symbol_table()[Name].second)->getType()->getPointerElementType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
@@ -442,7 +442,7 @@ Type *ArrayElement_ExprAST::getT()
 
 void ArrayElement_ExprAST::TypeCheck()
 {
-  AllocaInst *arr = context.locals()[Name];
+  AllocaInst *arr = cast<AllocaInst>(context.symbol_table()[Name].second);
   Type *arrT = arr->getType();
   if (!ArrayType::classof(arrT) && !(PointerType::classof(arrT)))
   {
@@ -708,7 +708,7 @@ Value *FuncCall::codegen()
   TypeCheck();
 
   // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
+  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
@@ -725,11 +725,11 @@ Value *FuncCall::codegen()
 
   for (std::vector<std::pair<std::string, Type *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
   {
-    if (PointerType::classof((context.locals()[it->first])->getAllocatedType()))
+    if (PointerType::classof((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType()))
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType(), cast<AllocaInst>(context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
       ArgsV.push_back(ldinst);
     }
@@ -737,7 +737,7 @@ Value *FuncCall::codegen()
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.locals()[it->first])->getAllocatedType(), (context.locals()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType(), cast<AllocaInst>(context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
   }
@@ -746,14 +746,14 @@ Value *FuncCall::codegen()
 
 Type *FuncCall::getT()
 {
-  Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
+  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
   return CalleeF->getFunctionType()->getReturnType();
 }
 
 void FuncCall::TypeCheck()
 {
   // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
+  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
   if (!CalleeF)
   {
     LogError("Unknown function referenced: " + Callee);
@@ -945,7 +945,7 @@ Value *FuncBody_AST::codegen()
 
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
-      context.locals()[VarName] = Alloca;
+      context.symbol_table()[VarName] = std::pair<std::string, Value *>(VarName, Alloca);
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -954,11 +954,14 @@ Value *FuncBody_AST::codegen()
       Builder.SetInsertPoint(context.currentBlock());
 
       /* save var defs so far */
-      for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
-        context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(it->second->getAllocatedType())));
+      for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
+      {
+        if (dyn_cast<AllocaInst>((it->second).second))
+          context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(cast<AllocaInst>((it->second).second)->getAllocatedType())));
+      }
 
       Function *fun = temp->codegen();
-      context.local_functions()[(temp->Proto->getName())] = std::pair<std::string, Value *>(fun->getName(), fun);
+      context.symbol_table()[(temp->Proto->getName())] = std::pair<std::string, Value *>(fun->getName(), fun);
 
       Builder.SetInsertPoint(context.currentBlock());
     }
@@ -996,30 +999,30 @@ Function *FunctionAST::codegen()
 
   if (context.id == 1)
   {
-    context.local_functions()["writeInteger"] = std::pair<std::string, Value *>("writeInteger", TheModule->getFunction("writeInteger"));
-    context.local_functions()["writeChar"] = std::pair<std::string, Value *>("writeChar", TheModule->getFunction("writeChar"));
-    context.local_functions()["writeByte"] = std::pair<std::string, Value *>("writeByte", TheModule->getFunction("writeByte"));
-    context.local_functions()["writeString"] = std::pair<std::string, Value *>("writeString", TheModule->getFunction("writeString"));
+    context.symbol_table()["writeInteger"] = std::pair<std::string, Value *>("writeInteger", TheModule->getFunction("writeInteger"));
+    context.symbol_table()["writeChar"] = std::pair<std::string, Value *>("writeChar", TheModule->getFunction("writeChar"));
+    context.symbol_table()["writeByte"] = std::pair<std::string, Value *>("writeByte", TheModule->getFunction("writeByte"));
+    context.symbol_table()["writeString"] = std::pair<std::string, Value *>("writeString", TheModule->getFunction("writeString"));
 
-    context.local_functions()["readInteger"] = std::pair<std::string, Value *>("readInteger", TheModule->getFunction("readInteger"));
-    context.local_functions()["readByte"] = std::pair<std::string, Value *>("readByte", TheModule->getFunction("readByte"));
-    context.local_functions()["readChar"] = std::pair<std::string, Value *>("readChar", TheModule->getFunction("readChar"));
-    context.local_functions()["readString"] = std::pair<std::string, Value *>("readString", TheModule->getFunction("readString"));
+    context.symbol_table()["readInteger"] = std::pair<std::string, Value *>("readInteger", TheModule->getFunction("readInteger"));
+    context.symbol_table()["readByte"] = std::pair<std::string, Value *>("readByte", TheModule->getFunction("readByte"));
+    context.symbol_table()["readChar"] = std::pair<std::string, Value *>("readChar", TheModule->getFunction("readChar"));
+    context.symbol_table()["readString"] = std::pair<std::string, Value *>("readString", TheModule->getFunction("readString"));
 
-    context.local_functions()["extend"] = std::pair<std::string, Value *>("extend", TheModule->getFunction("extend"));
-    context.local_functions()["shrink"] = std::pair<std::string, Value *>("shrink", TheModule->getFunction("shrink"));
+    context.symbol_table()["extend"] = std::pair<std::string, Value *>("extend", TheModule->getFunction("extend"));
+    context.symbol_table()["shrink"] = std::pair<std::string, Value *>("shrink", TheModule->getFunction("shrink"));
 
-    context.local_functions()["strlen"] = std::pair<std::string, Value *>("strlen", TheModule->getFunction("strlen"));
-    context.local_functions()["strcmp"] = std::pair<std::string, Value *>("strcmp", TheModule->getFunction("strcmp"));
-    context.local_functions()["strcpy"] = std::pair<std::string, Value *>("strcpy", TheModule->getFunction("strcpy"));
-    context.local_functions()["strcat"] = std::pair<std::string, Value *>("strcat", TheModule->getFunction("strcat"));
+    context.symbol_table()["strlen"] = std::pair<std::string, Value *>("strlen", TheModule->getFunction("strlen"));
+    context.symbol_table()["strcmp"] = std::pair<std::string, Value *>("strcmp", TheModule->getFunction("strcmp"));
+    context.symbol_table()["strcpy"] = std::pair<std::string, Value *>("strcpy", TheModule->getFunction("strcpy"));
+    context.symbol_table()["strcat"] = std::pair<std::string, Value *>("strcat", TheModule->getFunction("strcat"));
   }
 
   if (context.id > 1)
   {
     context.inherited() = prev->getInherited();
-    context.local_functions() = prev->getLocal_functions();
-    context.local_functions()[Proto->getName()] = std::pair<std::string, Value *>(TheFunction->getName(), TheFunction); //pushes itself on local definitions
+    context.symbol_table() = prev->getSymbolTable();
+    context.symbol_table()[Proto->getName()] = std::pair<std::string, Value *>(TheFunction->getName(), TheFunction); //pushes itself on local definitions
   }
 
   for (auto &Arg : TheFunction->args())
@@ -1029,7 +1032,7 @@ Function *FunctionAST::codegen()
     // Store the initial value into alloca
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
-    context.locals()[Arg.getName()] = Alloca;
+    context.symbol_table()[Arg.getName()] = std::pair<std::string, Value *>(Arg.getName(), Alloca);
   }
 
   Body->codegen();
@@ -1043,7 +1046,7 @@ Function *FunctionAST::codegen()
   {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << i->first << std::endl;
+    myfile << i->first << " - " << (i->second).size() << std::endl;
     for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
     {
       for (int i = 0; i < context.id; i++)
@@ -1054,25 +1057,13 @@ Function *FunctionAST::codegen()
   myfile << "\n";
   for (int i = 0; i < context.id; i++)
     myfile << "\t";
-  myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
+  myfile << "symbol_table: " << context.symbol_table().size() << std::endl;
 
-  for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+  for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
   {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << (it->first) << "   " << (it->second) << std::endl;
-  }
-
-  myfile << "\n";
-  for (int i = 0; i < context.id; i++)
-    myfile << "\t";
-  myfile << "Local Functions: " << context.getTop()->getLocal_functions().size() << std::endl;
-
-  for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.getTop()->getLocal_functions()).begin(); it != (context.getTop()->getLocal_functions()).end(); ++it)
-  {
-    for (int i = 0; i < context.id; i++)
-      myfile << "\t";
-    myfile << (it->first) << " - " << ((it->second).first) << std::endl;
+    myfile << (it->first) << "   " << (it->second).second << std::endl;
   }
   myfile << "\n";
 

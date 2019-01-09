@@ -26,8 +26,7 @@ class Scope
 
 private:
   int id;
-  std::map<std::string, AllocaInst *> locals;
-  std::map<std::string, std::pair<std::string, Value *>> local_functions;
+  std::map<std::string, std::pair<std::string, Value *>> symbol_table;
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
 
 public:
@@ -36,9 +35,8 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
 
-  std::map<std::string, AllocaInst *> &getLocals() { return locals; }
+  std::map<std::string, std::pair<std::string, Value *>> &getSymbolTable() { return symbol_table; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
-  std::map<std::string, std::pair<std::string, Value *>> &getLocal_functions() { return local_functions; }
 
   void setId(int n) { id = n; }
   Function *getFunction() { return fun; }
@@ -52,9 +50,8 @@ class Scopes
 public:
   int id = 0;
   Scopes() {}
-  std::map<std::string, AllocaInst *> &locals() { return functions.top()->getLocals(); }
+  std::map<std::string, std::pair<std::string, Value *>> &symbol_table() { return functions.top()->getSymbolTable(); }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return functions.top()->getInherited(); }
-  std::map<std::string, std::pair<std::string, Value *>> &local_functions() { return functions.top()->getLocal_functions(); }
   BasicBlock *currentBlock() { return functions.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
   {
