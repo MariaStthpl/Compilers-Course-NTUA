@@ -157,13 +157,13 @@ var_type:
 ;
 
 data_type:
-  TINT                                { $$ = Type::getInt16Ty(TheContext); }
-| TBYTE                               { $$ = Type::getInt8Ty(TheContext); }
+  TINT                                { $$ = getDataType(16); }
+| TBYTE                               { $$ = getDataType(8); }
 ;
 
 r_type:
   data_type                           { $$ = $1; }
-| "proc"                              { $$ = Type::getVoidTy(TheContext); }
+| "proc"                              { $$ = getDataType(0); }
 ;
 
 compound_stmt:
@@ -185,13 +185,6 @@ stmt:
 | "while" '(' cond ')' stmt           { $$ = new While_StmtAST($3, $5); }
 | "return" expr ';'                   { $$ = new Return_Stmt($2); }
 | "return" ';'                        { $$ = new Return_Stmt(nullptr); } 
-| "writeInteger" '(' expr ')' ';'     { $$ = new WriteInteger($3); }
-| "writeByte" '(' expr ')' ';'        { $$ = new WriteByte($3); }
-| "writeChar" '(' expr ')' ';'        { $$ = new WriteChar($3); }
-| "readString" '(' expr ',' T_id ')'  { $$ = new ReadString($3, new Id_ExprAST(*$5)); }
-| "writeString" '(' expr ')' ';'      { $$ = new WriteString($3); }
-| "strcpy" '(' expr ',' expr ')'      { $$ = new Strcpy($3, $5);  }
-| "strcat" '(' expr ',' expr ')'      { $$ = new Strcat($3, $5);  }
 ;
 
 l_value:
@@ -223,13 +216,6 @@ expr:
 | expr '%' expr                       { $$ = new ArithmeticOp_ExprAST($1, MOD, $3, 0); }
 | '+' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), PLUS, $2, 1); }   %prec UPLUS
 | '-' expr                            { $$ = new ArithmeticOp_ExprAST(new IntConst_ExprAST(0), MINUS, $2, 1); }  %prec UMINUS
-| "readInteger" '(' ')'               { $$ = new ReadInteger(); }
-| "readByte" '(' ')'                  { $$ = new ReadByte();    }
-| "readChar" '(' ')'                  { $$ = new ReadChar();    }
-| "shrink" '(' expr ')'               { $$ = new Shrink($3);    }
-| "extend" '(' expr ')'               { $$ = new Extend($3);    }
-| "strcmp" '(' expr ',' expr ')'      { $$ = new Strcmp($3,$5); }
-| "strlen" '(' expr ')'               { $$ = new Strlen($3); }
 ;
 
 cond:

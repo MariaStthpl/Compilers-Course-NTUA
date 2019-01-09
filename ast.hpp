@@ -21,82 +21,65 @@
 
 using namespace llvm;
 
-static LLVMContext TheContext;
-static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule;
-
-
-class CodeGenBlock
+class Scope
 {
+
+private:
   int id;
+  std::map<std::string, AllocaInst *> locals;
+  std::map<std::string, std::pair<std::string, Value *>> local_functions;
+  std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
 
 public:
   Function *fun;
-  CodeGenBlock *prev;
+  Scope *prev;
   BasicBlock *block;
   Value *returnValue = nullptr;
-  std::map<std::string, AllocaInst *> locals;
-  std::map<std::string, std::pair<std::string, Value *>> local_functions;
-  std::map<std::string, Type *> locals_type;
-  std::map<std::string, std::vector<std::pair<std::string, Type *>>> inherited;
-
-  std::map<std::string, std::vector<std::pair<std::string, Value *>>> funs;
-
 
   std::map<std::string, AllocaInst *> &getLocals() { return locals; }
-  std::map<std::string, Type *> &getLocals_Types() { return locals_type; }
   std::map<std::string, std::vector<std::pair<std::string, Type *>>> &getInherited() { return inherited; }
-
   std::map<std::string, std::pair<std::string, Value *>> &getLocal_functions() { return local_functions; }
-  std::map<std::string, std::vector<std::pair<std::string, Value *>>> &getFuns() { return funs; }
-
 
   void setId(int n) { id = n; }
-  int getId() { return id; }
   Function *getFunction() { return fun; }
 };
 
-class CodeGenContext
+class Scopes
 {
-  std::stack<CodeGenBlock *> blocks;
+  std::stack<Scope *> functions;
   Function *mainFunction;
 
 public:
   int id = 0;
-  Module *module;
-  CodeGenContext() {}
-  std::map<std::string, AllocaInst *> &locals() { return blocks.top()->locals; }
-  std::map<std::string, Type *> &locals_type() { return blocks.top()->locals_type; }
-  std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return blocks.top()->inherited; }
-
-  std::map<std::string, std::pair<std::string, Value *>> &local_functions() { return blocks.top()->local_functions; }
-  std::map<std::string, std::vector<std::pair<std::string, Value *>>> &funs() { return blocks.top()->funs; }
-
-  BasicBlock *currentBlock() { return blocks.top()->block; }
+  Scopes() {}
+  std::map<std::string, AllocaInst *> &locals() { return functions.top()->getLocals(); }
+  std::map<std::string, std::vector<std::pair<std::string, Type *>>> &inherited() { return functions.top()->getInherited(); }
+  std::map<std::string, std::pair<std::string, Value *>> &local_functions() { return functions.top()->getLocal_functions(); }
+  BasicBlock *currentBlock() { return functions.top()->block; }
   void pushBlock(BasicBlock *block, Function *f)
   {
-    blocks.push(new CodeGenBlock());
-    blocks.top()->returnValue = NULL;
-    blocks.top()->block = block;
-    blocks.top()->fun = f;
+    functions.push(new Scope());
+    functions.top()->returnValue = NULL;
+    functions.top()->block = block;
+    functions.top()->fun = f;
     id++;
-    blocks.top()->setId(id);
+    functions.top()->setId(id);
   }
   void popBlock()
   {
-    CodeGenBlock *top = blocks.top();
-    blocks.pop();
+    Scope *top = functions.top();
+    functions.pop();
     delete top;
     id--;
   }
-  void setCurrentReturnValue(Value *value) { blocks.top()->returnValue = value; }
-  CodeGenBlock *getTop() { return blocks.top(); }
-  void setPrev(CodeGenBlock *CB) { blocks.top()->prev = CB; }
-  CodeGenBlock *getPrev(CodeGenBlock *CB) { return CB->prev; }
-  Value *getCurrentReturnValue() { return blocks.top()->returnValue; }
+  Scope *getTop() { return functions.top(); }
+  void setPrev(Scope *CB) { functions.top()->prev = CB; }
+  Scope *getPrev(Scope *CB) { return CB->prev; }
+  void setCurrentReturnValue(Value *value) { functions.top()->returnValue = value; }
+  Value *getCurrentReturnValue() { return functions.top()->returnValue; }
 };
 
-extern CodeGenContext context;
+extern Scopes context;
 
 typedef enum
 {
@@ -140,6 +123,8 @@ typedef enum
   MOD
 } arithmetic_ops;
 
+/* get Types from Context for definitions */
+Type *getDataType(int n);
 
 /* ExprAST - Base class for all expression nodes. */
 class ExprAST
@@ -147,7 +132,7 @@ class ExprAST
 public:
   virtual ~ExprAST() {}
   virtual Value *codegen() = 0;
-  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
+  virtual Type *getT() { return IntegerType::get(getGlobalContext(), 1); };
 };
 
 /* StmtAST - Base class for all statement nodes. */
@@ -156,23 +141,21 @@ class StmtAST
 public:
   virtual ~StmtAST() {}
   virtual Value *codegen() = 0;
-  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
-  virtual void TypeCheck(){ return ; };
+  virtual Type *getT() { return IntegerType::get(getGlobalContext(), 1); };
+  virtual void TypeCheck() { return; };
 };
 
 /* CondAST - Base class for all condition nodes. */
 class CondAST
 {
-  // int Val;
-
 public:
-  // CondAST(double Val) : Val(Val){};
   virtual ~CondAST() {}
   virtual Value *codegen() = 0;
-  virtual Type *getT(){return IntegerType::get(getGlobalContext(), 1);};
+  virtual Type *getT() { return IntegerType::get(getGlobalContext(), 1); };
 };
 
 /* ------------------------------------------- ExprAST ------------------------------------------- */
+
 typedef std::vector<ExprAST *> ExpressionList;
 
 // <int-const>
@@ -226,7 +209,7 @@ public:
   virtual Type *getT() override;
 };
 
-//TODO: string literal
+// string literal
 class StringLiteral_ExprAST : public ExprAST
 {
   std::string string_literal;
@@ -250,6 +233,7 @@ public:
   ArithmeticOp_ExprAST(ExprAST *LHS, arithmetic_ops op, ExprAST *RHS, bool Unary) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)), Unary(std::move(Unary)) {}
   virtual Value *codegen() override;
   virtual Type *getT() override;
+  void TypeCheck();
 };
 
 /* ------------------------------------------- CondAST ------------------------------------------- */
@@ -277,6 +261,7 @@ class LogicalOp_CondAST : public CondAST
 public:
   LogicalOp_CondAST(CondAST *LHS, logical_ops op, CondAST *RHS) : LHS(std::move(LHS)), Op(op), RHS(std::move(RHS)) {}
   virtual Value *codegen() override;
+  void TypeCheck();
 };
 
 /* ------------------------------------------- StmtAST ------------------------------------------- */
@@ -316,6 +301,7 @@ public:
       : Callee(Callee), Args(std::move(Args)) {}
   virtual Value *codegen() override;
   virtual Type *getT() override;
+  virtual void TypeCheck() override;
 };
 
 // “if” '(' ⟨cond⟩ ')' ⟨stmt⟩ [ “else” ⟨stmt⟩ ]
@@ -358,7 +344,6 @@ class PrototypeAST
   Type *t;
   std::string Name;
   std::vector<std::pair<std::string, Type *>> Args;
-  // a.insert(std::end(a), std::begin(b), std::end(b));
 
 public:
   PrototypeAST(Type *t, const std::string &name, std::vector<std::pair<std::string, Type *>> Args) : t(t), Name(name), Args(std::move(Args)) {}
@@ -418,142 +403,6 @@ public:
   FunctionAST(PrototypeAST *Proto, FuncBody_AST *Body)
       : Proto(std::move(Proto)), Body(Body) {}
   Function *codegen() override;
-};
-
-/* ------------------------------------------- Custom Functions ------------------------------------------- */
-
-class WriteInteger : public StmtAST
-{
-  ExprAST *p;
-
-public:
-  WriteInteger(ExprAST *p) : p(std::move(p)) {}
-  virtual Value *codegen() override;
-  // virtual Type *getT() override;
-};
-
-class WriteByte : public StmtAST
-{
-  ExprAST *p;
-
-public:
-  WriteByte(ExprAST *p) : p(std::move(p)) {}
-  virtual Value *codegen() override;
-  // virtual Type* getT() override;
-};
-
-class WriteChar : public StmtAST
-{
-  ExprAST *p;
-
-public:
-  WriteChar(ExprAST *p) : p(std::move(p)) {}
-  virtual Value *codegen() override;
-  // virtual Type* getT() override;
-};
-
-class WriteString : public StmtAST
-{
-  ExprAST *str;
-
-public:
-  WriteString(ExprAST *str) : str(std::move(str)) {}
-  virtual Value *codegen() override;
-  // virtual Type* getT() override;
-};
-
-class ReadInteger : public ExprAST
-{
-public:
-  ReadInteger() {}
-  virtual Value *codegen() override;
-};
-
-class ReadByte : public ExprAST
-{
-public:
-  ReadByte() {}
-  virtual Value *codegen() override;
-};
-
-class ReadChar : public ExprAST
-{
-public:
-  ReadChar() {}
-  virtual Value *codegen() override;
-};
-
-class ReadString : public StmtAST
-{
-  ExprAST *expr;
-  Id_ExprAST *array;
-
-public:
-  ReadString(ExprAST *expr, Id_ExprAST *array) : expr(std::move(expr)), array(std::move(array)) {}
-  virtual Value *codegen() override;
-};
-
-class Extend : public ExprAST
-{
-  ExprAST *expr;
-
-public:
-  Extend(ExprAST *expr) : expr(std::move(expr)) {}
-  virtual Value *codegen() override;
-  // void getT();
-};
-
-class Shrink : public ExprAST
-{
-  ExprAST *expr;
-
-public:
-  Shrink(ExprAST *expr) : expr(std::move(expr)) {}
-  virtual Value *codegen() override;
-  // void getT();
-};
-
-class Strlen : public ExprAST
-{
-  ExprAST *Arr;
-
-public:
-  Strlen(ExprAST *Arr) : Arr(std::move(Arr)) {}
-  virtual Value *codegen() override;
-  // void getT();
-};
-
-class Strcpy : public StmtAST
-{
-  ExprAST *LArr;
-  ExprAST *RArr;
-
-public:
-  Strcpy(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
-  virtual Value *codegen() override;
-  // void getT();
-};
-
-class Strcmp : public ExprAST
-{
-  ExprAST *LArr;
-  ExprAST *RArr;
-
-public:
-  Strcmp(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
-  virtual Value *codegen() override;
-  // void getT();
-};
-
-class Strcat : public StmtAST
-{
-  ExprAST *LArr;
-  ExprAST *RArr;
-
-public:
-  Strcat(ExprAST *LArr, ExprAST *RArr) : LArr(std::move(LArr)), RArr(std::move(RArr)) {}
-  virtual Value *codegen() override;
-  // void getT();
 };
 
 void llvm_compile_and_dump(FunctionAST *t);

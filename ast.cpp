@@ -9,23 +9,18 @@ using namespace llvm;
 std::ofstream myfile;
 
 // Global LLVM variables related to the LLVM suite.
-// static LLVMContext TheContext;
-// //= Context::getGlobalContex;
-// static IRBuilder<> Builder(TheContext);
-// static std::unique_ptr<Module> TheModule;
-// static std::map<std::string, Value *> NamedValues;
-// static std::map<std::string, AllocaInst *> NamedValues;
+static LLVMContext TheContext;
+static IRBuilder<> Builder(TheContext);
+static std::unique_ptr<Module> TheModule;
 static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
-
-// Global LLVM variables related to the generated code.
-static GlobalVariable *TheVars;
-static GlobalVariable *TheNL;
 
 static Function *TheWriteInteger;
 static Function *TheWriteByte;
 static Function *TheWriteChar;
 static Function *TheWriteString;
+
 static Function *TheReadInteger;
+static Function *TheReadByte;
 static Function *TheReadChar;
 static Function *TheReadString;
 
@@ -35,11 +30,9 @@ static Function *TheStrcpy;
 static Function *TheStrcat;
 
 // Useful LLVM types.
-// static Type *i1 = IntegerType::get(TheContext, 1);
+static Type *proc = Type::getVoidTy(TheContext);
 static Type *i8 = IntegerType::get(TheContext, 8);
 static Type *i16 = IntegerType::get(TheContext, 16);
-static Type *i32 = IntegerType::get(TheContext, 32);
-// static Type *i64 = IntegerType::get(TheContext, 64);
 
 // Useful LLVM helper functions.
 inline ConstantInt *c1(char c)
@@ -51,16 +44,18 @@ inline ConstantInt *c8(char c)
 {
   return ConstantInt::get(TheContext, APInt(8, c, true));
 }
-inline ConstantInt *c32(int n)
-{
-  return ConstantInt::get(TheContext, APInt(32, n, true));
-}
+
 inline ConstantInt *c16(int n)
 {
   return ConstantInt::get(TheContext, APInt(16, n, true));
 }
 
-CodeGenContext context;
+inline ConstantInt *c32(int n)
+{
+  return ConstantInt::get(TheContext, APInt(32, n, true));
+}
+
+Scopes context;
 
 void llvm_compile_and_dump(FunctionAST *t)
 {
@@ -82,51 +77,55 @@ void llvm_compile_and_dump(FunctionAST *t)
   // TheFPM->add(createGVNPass());
   // TheFPM->add(createCFGSimplificationPass());
   TheFPM->doInitialization();
-  // Define and initialize global symbols.
-  // @vars = global [26 x i32] zeroinitializer, align 16
-  ArrayType *vars_type = ArrayType::get(i32, 26);
-  TheVars = new GlobalVariable(
-      *TheModule, vars_type, false, GlobalValue::PrivateLinkage,
-      ConstantAggregateZero::get(vars_type), "vars");
-  TheVars->setAlignment(16);
-  // @nl = private constant [2 x i8] c"\0A\00", align 1
-  ArrayType *nl_type = ArrayType::get(i8, 2);
-  TheNL = new GlobalVariable(
-      *TheModule, nl_type, true, GlobalValue::PrivateLinkage,
-      ConstantArray::get(nl_type,
-                         std::vector<Constant *>{c8('\n'), c8('\0')}),
-      "nl");
-  TheNL->setAlignment(1);
-  /* ------------------ declare library of functions --------------------------*/
-  // declare void @writeInteger(i64)
+
+  /* ---------------------------------------------------------------------------*/
+  /*                    declare functions of runtime library                    */
+  /* ---------------------------------------------------------------------------*/
+
+  /*----------------------------   WRITE functions  ----------------------------*/
+
+  // writeInteger (n : int) : proc
   FunctionType *writeInteger_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{i16}, false);
   TheWriteInteger =
       Function::Create(writeInteger_type, Function::ExternalLinkage,
                        "writeInteger", TheModule.get());
-  // declare void @writeByte(i8)
+
+  //  writeByte (b : byte) : proc
   FunctionType *writeByte_type =
-      FunctionType::get(Type::getInt8Ty(TheContext),
+      FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{i8}, false);
   TheWriteByte =
       Function::Create(writeByte_type, Function::ExternalLinkage,
-                       "ord", TheModule.get());
-  // declare void @writeChar(i8)
+                       "writeByte", TheModule.get());
+  Function::arg_iterator arg = TheWriteByte->arg_begin();
+  Value *byte = &(*arg);
+  BasicBlock *b = BasicBlock::Create(TheContext, "", TheWriteByte, 0);
+  Builder.SetInsertPoint(b);
+  Value *retint = Builder.CreateSExt(byte, i16);
+  Builder.CreateCall(TheWriteInteger, {retint});
+  Builder.CreateRet(nullptr);
+
+  //  writeChar (b : byte) : proc
   FunctionType *writeChar_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{i8}, false);
   TheWriteChar =
       Function::Create(writeChar_type, Function::ExternalLinkage,
                        "writeChar", TheModule.get());
-  // declare void @writeString(i8*)
+
+  // writeString (s : reference byte []) : proc
   FunctionType *writeString_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{PointerType::get(i8, 0)}, false);
   TheWriteString =
       Function::Create(writeString_type, Function::ExternalLinkage,
                        "writeString", TheModule.get());
-  /*----------------------------READS----------------------------*/
+
+  /*----------------------------   READ functions  ----------------------------*/
+
+  // readInteger () : int
   FunctionType *readInteger_type =
       FunctionType::get(Type::getInt16Ty(TheContext),
                         std::vector<Type *>(), false);
@@ -134,6 +133,15 @@ void llvm_compile_and_dump(FunctionAST *t)
       Function::Create(readInteger_type, Function::ExternalLinkage,
                        "readInteger", TheModule.get());
 
+  // readByte () : byte
+  FunctionType *readByte_type =
+      FunctionType::get(Type::getInt8Ty(TheContext),
+                        std::vector<Type *>(), false);
+  TheReadByte =
+      Function::Create(readByte_type, Function::ExternalLinkage,
+                       "readByte", TheModule.get());
+
+  // readChar () : byte
   FunctionType *readChar_type =
       FunctionType::get(Type::getInt8Ty(TheContext),
                         std::vector<Type *>(), false);
@@ -141,6 +149,7 @@ void llvm_compile_and_dump(FunctionAST *t)
       Function::Create(readChar_type, Function::ExternalLinkage,
                        "readChar", TheModule.get());
 
+  // readString (n : int, s : reference byte []) : proc
   FunctionType *readString_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{i16, PointerType::getUnqual(i8)}, false);
@@ -148,9 +157,34 @@ void llvm_compile_and_dump(FunctionAST *t)
       Function::Create(readString_type, Function::ExternalLinkage,
                        "readString", TheModule.get());
 
-  /*-----------------------------------------------------------------------------------
-  ---------------------           Functions for strings           ---------------------
-  -----------------------------------------------------------------------------------*/
+  /*----------------------------   CONVERSION functions  ----------------------------*/
+
+  // extend (b : byte) : int
+  FunctionType *extend_type =
+      FunctionType::get(Type::getInt16Ty(TheContext), std::vector<Type *>{i8}, false);
+  Function *TheExtend =
+      Function::Create(extend_type, Function::ExternalLinkage, "extend", TheModule.get());
+  arg = TheExtend->arg_begin();
+  Value *int8_c = &(*arg);
+  BasicBlock *bl = BasicBlock::Create(TheContext, "", TheExtend, 0);
+  Builder.SetInsertPoint(bl);
+  Value *ret = Builder.CreateSExt(int8_c, i16);
+  Builder.CreateRet(ret);
+
+  // shrink (i : int) : byte
+  FunctionType *shrink_type =
+      FunctionType::get(i8, std::vector<Type *>{i16}, false);
+  Function *TheShrink =
+      Function::Create(shrink_type, Function::ExternalLinkage, "shrink", TheModule.get());
+  arg = TheShrink->arg_begin();
+  Value *int16_c = &(*arg);
+  BasicBlock *bl2 = BasicBlock::Create(TheContext, "", TheShrink, 0);
+  Builder.SetInsertPoint(bl2);
+  ret = Builder.CreateTrunc(int16_c, i8);
+  Builder.CreateRet(ret);
+
+  /*----------------------------   STRING functions  ----------------------------*/
+
   // strlen (s : reference byte []) : int
   FunctionType *strlen_type =
       FunctionType::get(Type::getInt16Ty(TheContext),
@@ -158,21 +192,21 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheStrlen =
       Function::Create(strlen_type, Function::ExternalLinkage,
                        "strlen", TheModule.get());
-  //strcmp (s1 : reference byte [], s2 : reference byte []) : int
+  // strcmp (s1 : reference byte [], s2 : reference byte []) : int
   FunctionType *strcmp_type =
       FunctionType::get(Type::getInt16Ty(TheContext),
                         std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
   TheStrcmp =
       Function::Create(strcmp_type, Function::ExternalLinkage,
                        "strcmp", TheModule.get());
-  //strcpy (trg : reference byte [], src : reference byte []) : proc
+  // strcpy (trg : reference byte [], src : reference byte []) : proc
   FunctionType *strcpy_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
   TheStrcpy =
       Function::Create(strcpy_type, Function::ExternalLinkage,
                        "strcpy", TheModule.get());
-  //strcat (trg : reference byte [], src : reference byte []) : proc
+  // strcat (trg : reference byte [], src : reference byte []) : proc
   FunctionType *strcat_type =
       FunctionType::get(Type::getVoidTy(TheContext),
                         std::vector<Type *>{PointerType::getUnqual(i8), PointerType::getUnqual(i8)}, false);
@@ -181,8 +215,7 @@ void llvm_compile_and_dump(FunctionAST *t)
                        "strcat", TheModule.get());
 
   // Define and start the main function.
-  Function *main_function;
-  t->codegen();
+  Function *main_function = t->codegen();
   if (t->Proto->getName() != "main")
   {
     auto fun = TheModule->getFunction("main");
@@ -206,52 +239,18 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheModule->print(outs(), nullptr);
 }
 
-std::unique_ptr<ExprAST> LogError(const char *Str)
+Value *LogError(std::string Str)
 {
-  fprintf(stderr, "Error: %s\n", Str);
+  fprintf(stderr, "\nError: %s\n\n", Str.c_str());
   return nullptr;
-}
-
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str)
-{
-  LogError(Str);
-  return nullptr;
-}
-
-Value *LogErrorV(const char *Str)
-{
-  LogError(Str);
-  return nullptr;
-}
-
-Value *casting(Value *p)
-{
-  if (PointerType::classof(p->getType()))
-  {
-    Type *tempT = p->getType()->getPointerElementType();
-    if (tempT->isIntegerTy(8))
-      return Builder.CreatePointerCast(p, PointerType::getUnqual(i8), "cast");
-    else if (tempT->isIntegerTy(16))
-      return Builder.CreatePointerCast(p, PointerType::getUnqual(i16), "cast");
-  }
-  else
-  {
-    Type *tempT = p->getType();
-    if (tempT->isIntegerTy(8))
-      return Builder.CreateIntCast(p, i8, 0, "cast");
-    else if (tempT->isIntegerTy(16))
-      return Builder.CreateIntCast(p, i16, 1, "cast");
-  }
-  return p;
 }
 
 Value *loadValue(Value *p)
 {
   if (PointerType::classof(p->getType()))
-    return casting(Builder.CreateLoad(p, "var"));
+    return Builder.CreateLoad(p, "var");
   else
-    return casting(p);
-  return p;
+    return p;
 }
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of the function.
@@ -260,6 +259,21 @@ static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, const std::stri
   IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                    TheFunction->getEntryBlock().begin());
   return TmpB.CreateAlloca(t, 0, VarName.c_str());
+}
+
+Type *getDataType(int n)
+{
+  switch (n)
+  {
+  case 0:
+    return proc;
+  case 8:
+    return i8;
+  case 16:
+    return i16;
+  default:
+    return proc;
+  }
 }
 
 /* ------------------------------------------- IR for ExprAST ------------------------------------------- */
@@ -272,7 +286,7 @@ Value *IntConst_ExprAST::codegen()
 
 Type *IntConst_ExprAST::getT()
 {
-  return IntegerType::get(TheContext, 16);
+  return i16;
 }
 
 // IR for <char-const>
@@ -293,7 +307,7 @@ Value *Id_ExprAST::codegen()
   AllocaInst *V = context.locals()[Name];
   if (!V)
   {
-    LogErrorV("Unknown variable name");
+    LogError("Unknown variable name: " + Name);
     exit(1);
   }
 
@@ -314,7 +328,6 @@ Value *Id_ExprAST::codegen()
     indexList.push_back(c16(0));
     LoadInst *ldinst = Builder.CreateLoad(V, Name);
     GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((V->getAllocatedType())->getPointerElementType(), ldinst, ArrayRef<Value *>(indexList), Name, Builder.GetInsertBlock());
-    // return Builder.CreateLoad(gepInst, Name);
     return gepInst;
   }
   else if (ArrayType::classof(V->getAllocatedType()))
@@ -329,7 +342,6 @@ Value *Id_ExprAST::codegen()
   else
   {
     // id of IntegerType
-    Builder.CreateLoad(V, Name.c_str());
     return V;
   }
 
@@ -338,7 +350,27 @@ Value *Id_ExprAST::codegen()
 
 Type *Id_ExprAST::getT()
 {
-  return context.locals_type()[Name];
+  Value *V = context.locals()[Name];
+  if (!V)
+  {
+    LogError("Unknown variable name: " + Name);
+    exit(1);
+  }
+
+  Type *idT = context.locals()[Name]->getType();
+  if (PointerType::classof(idT))
+  {
+    if (ArrayType::classof(idT->getPointerElementType()))
+      return idT->getPointerElementType()->getArrayElementType();
+    else if (PointerType::classof(idT->getPointerElementType()))
+      return idT->getPointerElementType()->getPointerElementType();
+    else
+      return idT->getPointerElementType();
+  }
+  else if (ArrayType::classof(idT))
+    return idT->getArrayElementType();
+  else
+    return idT;
 }
 
 // IR for <id>[<expr>]
@@ -346,6 +378,12 @@ Value *ArrayElement_ExprAST::codegen()
 {
 
   AllocaInst *arr = context.locals()[Name];
+  if (!arr)
+  {
+    LogError("Unknown array name: " + Name);
+    exit(1);
+  }
+
   Value *index = expr->codegen();
   index = loadValue(index);
 
@@ -384,16 +422,37 @@ Value *ArrayElement_ExprAST::codegen()
 
 Type *ArrayElement_ExprAST::getT()
 {
-  // TypeCheck();
-  return context.locals_type()[Name];
+  TypeCheck();
+  Type *idT = context.locals()[Name]->getType()->getPointerElementType();
+  if (PointerType::classof(idT))
+  {
+    if (ArrayType::classof(idT->getPointerElementType()))
+      return idT->getPointerElementType()->getArrayElementType();
+    else if (PointerType::classof(idT->getPointerElementType()))
+
+      return (idT->getPointerElementType())->getPointerElementType();
+    else
+      return idT->getPointerElementType();
+  }
+  else if (ArrayType::classof(idT))
+    return idT->getArrayElementType();
+  else
+    return idT;
 }
 
 void ArrayElement_ExprAST::TypeCheck()
 {
-  Value *index = expr->codegen();
-  if (!(index->getType()->isIntegerTy(16)))
+  AllocaInst *arr = context.locals()[Name];
+  Type *arrT = arr->getType();
+  if (!ArrayType::classof(arrT) && !(PointerType::classof(arrT)))
   {
-    LogErrorV("\nIndex of array must be of int type\n");
+    LogError("Unknown array name: " + Name);
+    exit(1);
+  }
+  Type *indexT = expr->getT();
+  if (!(indexT->isIntegerTy(16)))
+  {
+    LogError("Index of array " + Name + "[] must be of int type");
     exit(1);
   }
   return;
@@ -402,35 +461,35 @@ void ArrayElement_ExprAST::TypeCheck()
 // IR for string-literal
 Value *StringLiteral_ExprAST::codegen()
 {
-  AllocaInst *alloca = Builder.CreateAlloca(ArrayType::get(IntegerType::get(TheContext, 8), string_literal.length() - 1), 0, "string");
-  std::vector<Value *> indexList;
-  indexList.push_back(c8(0));
+  std::vector<llvm::Constant *> values;
   size_t i;
   for (i = 1; i < string_literal.length() - 1; i++)
   {
-    indexList.push_back(c8(i - 1));
-    GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", Builder.GetInsertBlock());
-    Builder.CreateStore(c8(string_literal[i]), gepInst);
-    indexList.pop_back();
+    values.push_back(c8(string_literal[i]));
   }
-  indexList.push_back(c8(i - 1));
-  GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str", Builder.GetInsertBlock());
-  Builder.CreateStore(c8(0), gepInst);
-  indexList.pop_back();
+  values.push_back(c8('\0'));
 
-  indexList.push_back(c8(0));
-  gepInst = GetElementPtrInst::CreateInBounds(alloca->getAllocatedType(), alloca, ArrayRef<Value *>(indexList), "str_ptr", Builder.GetInsertBlock());
-  return gepInst;
+  ArrayType *string_type = ArrayType::get(i8, string_literal.length() - 1);
+  GlobalVariable *TheString = new GlobalVariable(
+      *TheModule, string_type, false, GlobalValue::InternalLinkage,
+      ConstantArray::get(string_type,
+                         values),
+      "string_literal");
+
+  Value *idxList[] = {c32(0), c32(0)};
+  return GetElementPtrInst::CreateInBounds(string_type, TheString, ArrayRef<Value *>(idxList), "str_ptr", Builder.GetInsertBlock());
 }
 
 Type *StringLiteral_ExprAST::getT()
 {
-  return PointerType::getUnqual(i8);
+  return i8;
 }
 
 // IR for ⟨expr⟩ ( '+' | '-' | '*' | '/' | '%' ) ⟨expr⟩
 Value *ArithmeticOp_ExprAST::codegen()
 {
+  TypeCheck();
+
   Value *L = LHS->codegen();
   Value *R = RHS->codegen();
   if (!L || !R)
@@ -455,25 +514,38 @@ Value *ArithmeticOp_ExprAST::codegen()
   case MOD:
     return Builder.CreateURem(L, R, "modtmp");
   default:
-    return LogErrorV("invalid binary operator");
+    return LogError("invalid binary operator");
   }
 }
 
 Type *ArithmeticOp_ExprAST::getT()
 {
-  Value *L = LHS->codegen();
-  Value *R = RHS->codegen();
-  L = loadValue(L);
-  R = loadValue(R);
+  Type *LT = LHS->getT();
+  Type *RT = RHS->getT();
+
   if (!Unary)
   {
-    if ((L->getType()) != (R->getType()))
+    if (LT != RT)
     {
-      LogErrorV("\noperands of arithmetic operation must be of same type\n");
+      LogError("\noperands of arithmetic operation must be of same type\n");
       exit(1);
     }
   }
-  return R->getType();
+  return RT;
+}
+
+void ArithmeticOp_ExprAST::TypeCheck()
+{
+  Type *LT = LHS->getT();
+  Type *RT = RHS->getT();
+
+  if (!Unary)
+    if (LT != RT)
+    {
+      LogError("\noperands of arithmetic operation must be of same type\n");
+      exit(1);
+    }
+  return;
 }
 
 /* ------------------------------------------- IR for CondAST ------------------------------------------- */
@@ -481,7 +553,7 @@ Type *ArithmeticOp_ExprAST::getT()
 // IR for ⟨expr⟩( '==' | '!=' | '<' | '>' | '<=' | '>=' )⟨expr⟩
 Value *ComparisonOp_CondAST::codegen()
 {
-  // TypeCheck();
+  TypeCheck();
 
   Value *l = LHS->codegen();
   Value *r = RHS->codegen();
@@ -506,21 +578,20 @@ Value *ComparisonOp_CondAST::codegen()
   case NE:
     return Builder.CreateICmpNE(l, r, "netmp");
   default:
-    return LogErrorV("invalid binary operator");
+    return LogError("invalid binary operator");
   }
 }
 
 void ComparisonOp_CondAST::TypeCheck()
 {
-  Value *L = LHS->codegen();
-  Value *R = RHS->codegen();
-  L = loadValue(L);
-  R = loadValue(R);
-  // if ((L->getType()) != (R->getType()))
-  // {
-  //   LogErrorV("\noperands of comparison operation must be of same type\n");
-  //   exit(1);
-  // }
+  Type *LT = LHS->getT();
+  Type *RT = RHS->getT();
+
+  if (LT != RT)
+  {
+    LogError("\noperands of comparison operation must be of same type\n");
+    exit(1);
+  }
   return;
 }
 
@@ -548,8 +619,21 @@ Value *LogicalOp_CondAST::codegen()
   case NOT:
     return Builder.CreateNot(l, "nottmp");
   default:
-    return LogErrorV("invalid binary operator");
+    return LogError("invalid binary operator");
   }
+}
+
+void LogicalOp_CondAST::TypeCheck()
+{
+  Type *LT = LHS->getT();
+  Type *RT = RHS->getT();
+
+  if (LT != RT)
+  {
+    LogError("\noperands of logical operation must be of same type\n");
+    exit(1);
+  }
+  return;
 }
 
 /* ------------------------------------------- IR for StmtAST ------------------------------------------- */
@@ -557,7 +641,10 @@ Value *LogicalOp_CondAST::codegen()
 // IR for ⟨l-value⟩ '=' ⟨expr⟩
 Value *Assignment_StmtAST::codegen()
 {
-  // TypeCheck();
+  TypeCheck();
+
+  // l-value is always a pointer
+  Value *V = LHS->codegen();
 
   // evaluate r-value
   Value *Val = RHS->codegen();
@@ -567,32 +654,39 @@ Value *Assignment_StmtAST::codegen()
   // if r-value is pointer, load its value
   Val = loadValue(Val);
 
-  // l-value is always a pointer
-  Value *V = LHS->codegen();
-  V = casting(V);
-
-  return Builder.CreateStore(Val, V);
+  // special case: assign string_literal to array
+  // TODO assign array to array ???
+  if (StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(RHS))
+  {
+    Id_ExprAST *idexpr = dynamic_cast<Id_ExprAST *>(LHS);
+    size_t i;
+    for (i = 1; i < str->getString().length() - 1; i++)
+    {
+      Assignment_StmtAST *assignelement = new Assignment_StmtAST(
+          new ArrayElement_ExprAST(idexpr->getName(), new IntConst_ExprAST(i - 1)),
+          new CharConst_ExprAST(str->getString()[i]));
+      assignelement->codegen();
+    }
+    Assignment_StmtAST *assignelement = new Assignment_StmtAST(
+        new ArrayElement_ExprAST(idexpr->getName(), new IntConst_ExprAST(i - 1)),
+        new CharConst_ExprAST('\0'));
+    assignelement->codegen();
+    return c8(0);
+  }
+  else
+    return Builder.CreateStore(Val, V);
 }
 
 void Assignment_StmtAST::TypeCheck()
 {
-  // Value *L = LHS->codegen();
-  // Value *R = RHS->codegen();
+  Type *LT = LHS->getT();
+  Type *RT = RHS->getT();
 
-  // Type *LT = L->getType();
-  // Type *RT = R->getType();
-
-  // if (LT->isPointerTy())
-  //   LT = LT->getPointerElementType();
-
-  // if (RT->isPointerTy())
-  //   RT = RT->getPointerElementType();
-
-  // if (!(LT->isIntegerTy(16) && (RT->isIntegerTy(16))) && !(LT->isIntegerTy(8) && (RT->isIntegerTy(8))))
-  // {
-  //   LogErrorV("\noperands of assignement operation must be of same type\n");
-  //   exit(1);
-  // }
+  if (LT != RT)
+  {
+    LogError("operands of assignement operation must be of same type");
+    exit(1);
+  }
   return;
 }
 
@@ -611,17 +705,10 @@ Value *CompoundStmt_StmtAST::codegen()
 // IR for ⟨func-call⟩
 Value *FuncCall::codegen()
 {
+  TypeCheck();
+
   // Look up the name in the global module table.
   Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
-  if (!CalleeF)
-    return LogErrorV("Unknown function referenced");
-
-  // If argument mismatch error. Except the real parameters, we take into consideration the # pointers of previous variables' declaration
-  if (CalleeF->arg_size() != (Args.size() + (context.getTop()->inherited[Callee]).size()))
-  {
-    LogErrorV("Incorrect # arguments passed");
-    exit(1);
-  }
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
@@ -654,13 +741,39 @@ Value *FuncCall::codegen()
       ArgsV.push_back(gepInst);
     }
   }
-  return Builder.CreateCall(CalleeF, ArgsV); // "calltmp"
+  return Builder.CreateCall(CalleeF, ArgsV);
 }
 
 Type *FuncCall::getT()
 {
+  Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
+  return CalleeF->getFunctionType()->getReturnType();
+}
 
-  return context.getTop()->getFunction()->getFunctionType()->getReturnType();
+void FuncCall::TypeCheck()
+{
+  // Look up the name in the global module table.
+  Function *CalleeF = TheModule->getFunction(((context.local_functions()[Callee]).first));
+  if (!CalleeF)
+  {
+    LogError("Unknown function referenced: " + Callee);
+    exit(1);
+  }
+
+  // Check argument mismatch error: Except the real parameters, we take into consideration the #pointers of previous variables' declaration
+  if (CalleeF->arg_size() != (Args.size() + (context.getTop()->getInherited()[Callee]).size()))
+  {
+    LogError("Incorrect # arguments passed in function: " + Callee);
+    exit(1);
+  }
+
+  // TODO check if arguments of func call are the same type with function's arguments
+  // FunctionType *FTy = CalleeF->getFunctionType();
+  // for (unsigned i = 0, e = Args.size(); i != e; ++i)
+  // {
+  //   if ( FTY->getParamType(i) !=  )
+  // }
+  return;
 }
 
 // IR for “if” '(' ⟨cond⟩ ')' ⟨stmt⟩ [ “else” ⟨stmt⟩ ]
@@ -685,7 +798,6 @@ Value *If_StmtAST::codegen()
   if (!ThenV)
     return nullptr;
 
-  // Builder.SetInsertPoint(ThenBB);
   if (!Builder.GetInsertBlock()->getTerminator())
     Builder.CreateBr(MergeBB);
 
@@ -749,29 +861,20 @@ Value *While_StmtAST::codegen()
 // IR for “return” [ ⟨expr⟩ ]
 Value *Return_Stmt::codegen()
 {
-  // TypeCheck();
+  TypeCheck();
   if (expr == nullptr)
   {
     context.setCurrentReturnValue(nullptr);
-    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-
-    Function *TheFunction = Builder.GetInsertBlock()->getParent();
-    BasicBlock *BB = BasicBlock::Create(TheContext, "return");
     if (!Builder.GetInsertBlock()->getTerminator())
-      Builder.CreateBr(BB);
-    Builder.SetInsertPoint(BB);
+      ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     return c32(0);
   }
 
   Value *returnValue = expr->codegen();
   returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
-  ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
-  Function *TheFunction = Builder.GetInsertBlock()->getParent();
-  BasicBlock *BB = BasicBlock::Create(TheContext, "return");
   if (!Builder.GetInsertBlock()->getTerminator())
-    Builder.CreateBr(BB);
-  Builder.SetInsertPoint(BB);
+    ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
   return returnValue;
 }
 
@@ -781,15 +884,15 @@ void Return_Stmt::TypeCheck()
 
   if (!expr)
   {
-    if (!ret->isVoidTy())
+    if (!(ret->isVoidTy()))
     {
-      LogErrorV("Return type of function doesn't match definition type which is void");
+      LogError("Return type of function doesn't match definition type which is void");
       exit(1);
     }
   }
-  else if (!(ret->isIntegerTy(16) && expr->getT()->isIntegerTy(16)) && !(ret->isIntegerTy(8) && expr->getT()->isIntegerTy(8)))
+  else if (ret != expr->getT())
   {
-    LogErrorV("Return type of function doesn't match definition type ");
+    LogError("Return type of function " + std::string((context.getTop()->getFunction()->getName())) + " doesn't match definition type ");
     exit(1);
   }
   return;
@@ -801,7 +904,7 @@ Function *PrototypeAST::codegen()
 {
   /* pass previous variables as pointers */
   if (context.id > 0)
-    Args.insert(Args.end(), (context.getTop())->inherited[Name].begin(), (context.getTop())->inherited[Name].end());
+    Args.insert(Args.end(), (context.getTop())->getInherited()[Name].begin(), (context.getTop())->getInherited()[Name].end());
 
   std::vector<Type *> argTypes = getArgsTypes();
 
@@ -843,7 +946,6 @@ Value *FuncBody_AST::codegen()
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
       context.locals()[VarName] = Alloca;
-      context.locals_type()[VarName] = t;
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -876,7 +978,6 @@ Function *FunctionAST::codegen()
   // First, check for an existing function from a previous 'extern' declaration.
   Function *TheFunction = TheModule->getFunction(Proto->getName());
 
-  // if (!TheFunction)
   TheFunction = Proto->codegen();
 
   for (int i = 0; i < context.id; i++)
@@ -885,7 +986,7 @@ Function *FunctionAST::codegen()
 
   // Create a new basic block to start insertion into.
   BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  CodeGenBlock *prev = nullptr;
+  Scope *prev = nullptr;
   if (context.id > 0)
     prev = context.getTop();
   context.pushBlock(BB, TheFunction);
@@ -904,18 +1005,23 @@ Function *FunctionAST::codegen()
     context.local_functions()["readByte"] = std::pair<std::string, Value *>("readByte", TheModule->getFunction("readByte"));
     context.local_functions()["readChar"] = std::pair<std::string, Value *>("readChar", TheModule->getFunction("readChar"));
     context.local_functions()["readString"] = std::pair<std::string, Value *>("readString", TheModule->getFunction("readString"));
-    // add rest functions TODO
+
+    context.local_functions()["extend"] = std::pair<std::string, Value *>("extend", TheModule->getFunction("extend"));
+    context.local_functions()["shrink"] = std::pair<std::string, Value *>("shrink", TheModule->getFunction("shrink"));
+
+    context.local_functions()["strlen"] = std::pair<std::string, Value *>("strlen", TheModule->getFunction("strlen"));
+    context.local_functions()["strcmp"] = std::pair<std::string, Value *>("strcmp", TheModule->getFunction("strcmp"));
+    context.local_functions()["strcpy"] = std::pair<std::string, Value *>("strcpy", TheModule->getFunction("strcpy"));
+    context.local_functions()["strcat"] = std::pair<std::string, Value *>("strcat", TheModule->getFunction("strcat"));
   }
 
   if (context.id > 1)
   {
     context.inherited() = prev->getInherited();
     context.local_functions() = prev->getLocal_functions();
-    context.locals_type() = prev->getLocals_Types();
     context.local_functions()[Proto->getName()] = std::pair<std::string, Value *>(TheFunction->getName(), TheFunction); //pushes itself on local definitions
   }
 
-  // Record the function arguments in the NamedValues map.
   for (auto &Arg : TheFunction->args())
   {
     // Create an alloca for this variable
@@ -924,204 +1030,70 @@ Function *FunctionAST::codegen()
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
     context.locals()[Arg.getName()] = Alloca;
-    context.locals_type()[Arg.getName()] = Arg.getType();
   }
 
-  if (Body->codegen())
+  Body->codegen();
+
+  // debug print
+  myfile << "\n";
+  for (int i = 0; i < context.id; i++)
+    myfile << "\t";
+  myfile << "Childs: " << context.getTop()->getInherited().size() << std::endl;
+  for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
   {
-
-    myfile << "\n";
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << "Childs: " << context.getTop()->getInherited().size() << std::endl;
-    for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
-    {
-      for (int i = 0; i < context.id; i++)
-        myfile << "\t";
-      myfile << i->first << std::endl;
-      for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
-      {
-        for (int i = 0; i < context.id; i++)
-          myfile << "\t";
-        myfile << (it->first) << "   " << (it->second) << std::endl;
-      }
-    }
-    myfile << "\n";
-    for (int i = 0; i < context.id; i++)
-      myfile << "\t";
-    myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
-
-    for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+    myfile << i->first << std::endl;
+    for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
     {
       for (int i = 0; i < context.id; i++)
         myfile << "\t";
       myfile << (it->first) << "   " << (it->second) << std::endl;
     }
+  }
+  myfile << "\n";
+  for (int i = 0; i < context.id; i++)
+    myfile << "\t";
+  myfile << "Locals: " << context.getTop()->getLocals().size() << std::endl;
 
-    myfile << "\n";
+  for (std::map<std::string, AllocaInst *>::iterator it = (context.getTop()->getLocals()).begin(); it != (context.getTop()->getLocals()).end(); ++it)
+  {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << "Local Functions: " << context.getTop()->getLocal_functions().size() << std::endl;
-
-    for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.getTop()->getLocal_functions()).begin(); it != (context.getTop()->getLocal_functions()).end(); ++it)
-    {
-      for (int i = 0; i < context.id; i++)
-        myfile << "\t";
-      myfile << (it->first) << " - " << ((it->second).first) << std::endl;
-    }
-    myfile << "\n";
-
-    // Finish off the function.
-    if (!Builder.GetInsertBlock()->getTerminator())
-      Builder.CreateRet(context.getCurrentReturnValue());
-    context.popBlock();
-
-    // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
-    TheFPM->run(*TheFunction);
-    return TheFunction;
+    myfile << (it->first) << "   " << (it->second) << std::endl;
   }
+
+  myfile << "\n";
+  for (int i = 0; i < context.id; i++)
+    myfile << "\t";
+  myfile << "Local Functions: " << context.getTop()->getLocal_functions().size() << std::endl;
+
+  for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.getTop()->getLocal_functions()).begin(); it != (context.getTop()->getLocal_functions()).end(); ++it)
+  {
+    for (int i = 0; i < context.id; i++)
+      myfile << "\t";
+    myfile << (it->first) << " - " << ((it->second).first) << std::endl;
+  }
+  myfile << "\n";
+
+  if ((!context.getCurrentReturnValue() && !context.getTop()->getFunction()->getFunctionType()->getReturnType()->isVoidTy()) || (context.getCurrentReturnValue() && (context.getCurrentReturnValue()->getType() != context.getTop()->getFunction()->getFunctionType()->getReturnType())))
+  {
+    LogError("Return type of function doesn't match definition type");
+    exit(1);
+  }
+
+  // Finish off the function.
+  if (!Builder.GetInsertBlock()->getTerminator())
+    Builder.CreateRet(context.getCurrentReturnValue());
+  context.popBlock();
+
+  // Validate the generated code, checking for consistency.
+  verifyFunction(*TheFunction);
+  TheFPM->run(*TheFunction);
+  return TheFunction;
 
   // Error reading body, remove function.
   TheFunction->eraseFromParent();
 
   return nullptr;
-}
-
-/* ------------------------------------------- IR for Custom Functions ------------------------------------------- */
-
-Value *WriteInteger::codegen()
-{
-  Value *n = p->codegen();
-  n = loadValue(n);
-  if (!((n->getType()->isIntegerTy(16))))
-    LogErrorV("Variable is wrong type(Integer expected)");
-  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n});
-  // Value *idxList[] = {c32(0), c32(0)};
-  // Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-  // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  return c8(0);
-}
-
-Value *WriteByte::codegen()
-{
-  Value *n = p->codegen();
-  n = loadValue(n);
-  if (!((n->getType()->isIntegerTy(8))))
-    LogErrorV("Variable is wrong type(Byte expected)");
-  Value *ch = Builder.CreateCall(TheWriteByte, std::vector<Value *>{n});
-  Value *n16 = Builder.CreateZExtOrTrunc(ch, i16, "ext");
-  Builder.CreateCall(TheWriteInteger, std::vector<Value *>{n16});
-  // Value *idxList[] = {c32(0), c32(0)};
-  // Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-  // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  return c8(0);
-}
-
-Value *WriteChar::codegen()
-{
-  Value *n = p->codegen();
-  n = loadValue(n);
-  if (!((n->getType()->isIntegerTy(8))))
-    LogErrorV("Variable is wrong type(Byte expected)");
-  Builder.CreateCall(TheWriteChar, std::vector<Value *>{n});
-  // Value *idxList[] = {c32(0), c32(0)};
-  // Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-  // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  return c8(0);
-}
-
-Value *WriteString::codegen()
-{
-  Value *idxList[] = {c32(0), c32(0)};
-  Value *nl = Builder.CreateGEP(TheNL, idxList, "nl");
-  Value *n = str->codegen();
-  if (n->getType()->isPointerTy() && n->getType()->getPointerElementType()->isIntegerTy(8))
-  {
-    Builder.CreateCall(TheWriteString, std::vector<Value *>{n});
-    // Builder.CreateCall(TheWriteString, std::vector<Value *>{nl});
-  }
-  else
-  {
-    LogErrorV("Parameter is wrong type (String expected)");
-  }
-  return c8(0);
-}
-
-Value *ReadInteger::codegen()
-{
-  Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
-  if (!(r->getType()->isIntegerTy(16)))
-    LogErrorV("Wrong type of input. ReadInteger expects Integer type");
-  return r;
-}
-
-Value *ReadByte::codegen()
-{
-  Value *r = Builder.CreateCall(TheReadInteger, std::vector<Value *>());
-  Value *n8 = Builder.CreateZExtOrTrunc(r, i8, "ext");
-  // if (!(r->getType()->isIntegerTy(8)))
-  //   LogErrorV("Wrong type of input. ReadByte expects Byte type");
-  return n8;
-}
-
-Value *ReadChar::codegen()
-{
-  Value *r = Builder.CreateCall(TheReadChar, std::vector<Value *>());
-  if (!(r->getType()->isIntegerTy(8)))
-    LogErrorV("Wrong type of input. ReadChar expects Byte type");
-  return r;
-}
-
-Value *ReadString::codegen()
-{
-  Value *n = expr->codegen();
-  Value *arr = array->codegen();
-  Builder.CreateCall(TheReadString, std::vector<Value *>{n, arr});
-  return c16(0);
-}
-
-Value *Extend::codegen()
-{
-  Value *n = expr->codegen();
-  n = loadValue(n);
-  if (!(n->getType()->isIntegerTy(8)))
-    LogErrorV("Wrong type of input. Extend expects Byte type");
-  return Builder.CreateZExtOrTrunc(n, i16, "ext");
-}
-
-Value *Shrink::codegen()
-{
-  Value *n = expr->codegen();
-  n = loadValue(n);
-  if (!(n->getType()->isIntegerTy(16)))
-    LogErrorV("Wrong type of input. Shrink expects int type");
-  return Builder.CreateZExtOrTrunc(n, i8, "ext");
-}
-
-Value *Strlen::codegen()
-{
-  Value *n = Arr->codegen();
-  return Builder.CreateCall(TheStrlen, std::vector<Value *>{n}, "strlen");
-}
-
-Value *Strcmp::codegen()
-{
-  Value *arr1 = LArr->codegen();
-  Value *arr2 = RArr->codegen();
-  return Builder.CreateCall(TheStrcmp, std::vector<Value *>{arr1, arr2});
-}
-
-Value *Strcpy::codegen()
-{
-  Value *arr1 = LArr->codegen();
-  Value *arr2 = RArr->codegen();
-  return Builder.CreateCall(TheStrcpy, std::vector<Value *>{arr1, arr2});
-}
-
-Value *Strcat::codegen()
-{
-  Value *arr1 = LArr->codegen();
-  Value *arr2 = RArr->codegen();
-  return Builder.CreateCall(TheStrcat, std::vector<Value *>{arr1, arr2});
 }

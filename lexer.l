@@ -91,6 +91,25 @@ string *fixEscapeChars (char* stringToFix, char mode) {
     return temp;
 }
 
+int hex2bin( const char *s )
+{
+    int ret=0;
+    int i;
+    for( i=0; i<2; i++ )
+    {
+        char c = *s++;
+        int n=0;
+        if( '0'<=c && c<='9' )
+            n = c-'0';
+        else if( 'a'<=c && c<='f' )
+            n = 10 + c-'a';
+        else if( 'A'<=c && c<='F' )
+            n = 10 + c-'A';
+        ret = n + ret*16;
+    }
+    return ret;
+}
+
 %}
 
 L [a-zA-Z]
@@ -101,6 +120,7 @@ ES "\\n"|"\\t"|"\\r"|"\\0"|"\\\\"|"\\'"|"\\\""|"\\x"{HEX}{2}
 CC ([^'\"\\]|{ES})
 
 %x COMMENT
+%x CHARACTER
 
 %%
 
@@ -115,14 +135,6 @@ CC ([^'\"\\]|{ES})
 "return"                { return TRETURN; }
 "while"                 { return TWHILE; }
 
-"extend"                { return T_EXNTEND; }
-"shrink"                { return T_SHRINK; }
-
-"strlen"                { return T_STRLEN; }
-"strcmp"                { return T_STRCMP; }
-"strcpy"                { return T_STRCPY; }
-"strcat"                { return T_STRCAT; }
-
 [-=+*/%!&|<>]           { return yytext[0]; }
 [()}{,:;]               { return yytext[0]; }
 "["                     { return yytext[0]; }
@@ -132,13 +144,23 @@ CC ([^'\"\\]|{ES})
 "=="				    { return EQ_OP; }
 "!="				    { return NEQ_OP; }
 
-'{CC}'                  { string *tempC = fixEscapeChars(yytext, 'c'); yylval.c = (*tempC)[1]; return T_CHAR_CONST; }
+'                       { BEGIN(CHARACTER); }
+<CHARACTER>\\x{HEX}{2}  { yylval.c = hex2bin(&yytext[2]); return T_CHAR_CONST; }
+<CHARACTER>\\0          { yylval.c = 0; return T_CHAR_CONST; }
+<CHARACTER>\\n          { yylval.c = 10; return T_CHAR_CONST; }
+<CHARACTER>\\t          { yylval.c = 9; return T_CHAR_CONST; }
+<CHARACTER>\\r          { yylval.c = 13; return T_CHAR_CONST; }
+<CHARACTER>\\\\         { yylval.c = 92; return T_CHAR_CONST; }
+<CHARACTER>\\\"         { yylval.c = 34; return T_CHAR_CONST; }
+<CHARACTER>[^'\"\\]     { yylval.c = yytext[0]; return T_CHAR_CONST; }
+<CHARACTER>'            { BEGIN(INITIAL); }
+
 \"([^'\"\\\n]|{ES})*\"  { yylval.s = fixEscapeChars(yytext, 's'); return T_STRING; }
 {L}({D}|{L}|_)*         { yylval.s = new std::string(yytext); return T_id; }
 {D}+                    { yylval.n = atoi(yytext); return T_INT_CONST; }
 \n                      { linenumber++;  /* ignore new lines */ }
 {W}+                    { /* ignore other white space */ }
-"--".*                  { printf("COMMENT\n"); } /* TODO: must create new %x state to count number of new lines */
+"--".*                  { }
 "(*"                    { comm_num++; BEGIN(COMMENT); }
 <COMMENT>"(*"           { comm_num++;}
 <COMMENT>\n             { linenumber++; }
