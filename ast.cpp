@@ -708,7 +708,7 @@ Value *FuncCall::codegen()
   TypeCheck();
 
   // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = dyn_cast<Function>(context.symbol_table()[Callee].second); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
@@ -723,13 +723,13 @@ Value *FuncCall::codegen()
       return nullptr;
   }
 
-  for (std::vector<std::pair<std::string, Type *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
+  for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
   {
-    if (PointerType::classof((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType()))
+    if (PointerType::classof(((it->second).second)->getAllocatedType()))
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType(), cast<AllocaInst>(context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((it->second).second)->getAllocatedType(), (it->second).second, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
       ArgsV.push_back(ldinst);
     }
@@ -737,7 +737,7 @@ Value *FuncCall::codegen()
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((cast<AllocaInst>(context.symbol_table()[it->first].second))->getAllocatedType(), cast<AllocaInst>(context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((it->second).second)->getAllocatedType(), (it->second).second, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
   }
@@ -753,7 +753,7 @@ Type *FuncCall::getT()
 void FuncCall::TypeCheck()
 {
   // Look up the name in the global module table.
-  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = dyn_cast<Function>(context.symbol_table()[Callee].second); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
   if (!CalleeF)
   {
     LogError("Unknown function referenced: " + Callee);
@@ -904,7 +904,8 @@ Function *PrototypeAST::codegen()
 {
   /* pass previous variables as pointers */
   if (context.id > 0)
-    Args.insert(Args.end(), (context.getTop())->getInherited()[Name].begin(), (context.getTop())->getInherited()[Name].end());
+    for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.getTop())->getInherited()[Name].begin(); it != (context.getTop())->getInherited()[Name].end(); ++it)
+      Args.push_back(std::pair<std::string, Type *>(it->first, (it->second).first));
 
   std::vector<Type *> argTypes = getArgsTypes();
 
@@ -957,7 +958,7 @@ Value *FuncBody_AST::codegen()
       for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
       {
         if (dyn_cast<AllocaInst>((it->second).second))
-          context.inherited()[(temp->Proto->getName()).c_str()].push_back(std::pair<std::string, Type *>(it->first, PointerType::getUnqual(cast<AllocaInst>((it->second).second)->getAllocatedType())));
+          ((context.inherited()[(temp->Proto->getName()).c_str()])[it->first]) = (std::pair<Type *, AllocaInst *>(PointerType::getUnqual(cast<AllocaInst>((it->second).second)->getAllocatedType()), cast<AllocaInst>((it->second).second)));
       }
 
       Function *fun = temp->codegen();
@@ -1042,16 +1043,17 @@ Function *FunctionAST::codegen()
   for (int i = 0; i < context.id; i++)
     myfile << "\t";
   myfile << "Childs: " << context.getTop()->getInherited().size() << std::endl;
-  for (std::map<std::string, std::vector<std::pair<std::string, Type *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
+  for (std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>>::iterator i = (context.inherited()).begin(); i != (context.inherited()).end(); ++i)
   {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
     myfile << i->first << " - " << (i->second).size() << std::endl;
-    for (std::vector<std::pair<std::string, Type *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
+    for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = i->second.begin(); it != i->second.end(); ++it)
     {
       for (int i = 0; i < context.id; i++)
         myfile << "\t";
-      myfile << (it->first) << "   " << (it->second) << std::endl;
+      myfile << "\t";
+      myfile << (it->first) << std::endl;
     }
   }
   myfile << "\n";
