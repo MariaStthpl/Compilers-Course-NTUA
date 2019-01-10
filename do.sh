@@ -9,7 +9,7 @@ if [ "$1" != "" ]; then
     ./minibasic < $1 > a.ll
     llc a.ll -o a.s
     clang a.s lib.a -o a.out
-    opt -dot-cfg a.ll
+    # opt -dot-cfg a.ll
     ./a.out
 
     # clang++

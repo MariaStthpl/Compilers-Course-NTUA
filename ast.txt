@@ -1,61 +1,62 @@
 New function: main
-	New function: newline
-
-		Childs: 2
-		newline
-		writeString
-
-		Locals: 0
-
-		Local Functions: 9
-		newline - newline
-		readByte - readByte
-		readChar - readChar
-		readInteger - readInteger
-		readString - readString
-		writeByte - writeByte
-		writeChar - writeChar
-		writeInteger - writeInteger
-		writeString - writeString
-
-	New function: writeString
+	New function: fun
 
 		Childs: 3
-		newline
-		writeInteger
-		writeString
+		fun - 3
+			a
+			x
+			y
+		writeInteger - 0
+		writeString - 0
 
-		Locals: 1
-		i   0x1f2a1f8
-
-		Local Functions: 9
-		newline - newline
-		readByte - readByte
-		readChar - readChar
-		readInteger - readInteger
-		readString - readString
-		writeByte - writeByte
-		writeChar - writeChar
-		writeInteger - writeInteger
-		writeString - writeString.1
+		symbol_table: 20
+		a   0x1b38128   2
+		extend   0x1b34fe8   0
+		fun   0x1b370e8   1
+		readByte   0x1b34c88   0
+		readChar   0x1b34da8   0
+		readInteger   0x1b34b68   0
+		readString   0x1b34ec8   0
+		shrink   0x1b35248   0
+		strcat   0x1b34578   0
+		strcmp   0x1b355b8   0
+		strcpy   0x1b356c8   0
+		strlen   0x1b354a8   0
+		writeByte   0x1b34638   0
+		writeChar   0x1b34928   0
+		writeInteger   0x1b34028   0
+		writeString   0x1b34a48   0
+		x   0x1b37f08   2
+		x1   0x1b38238   2
+		y   0x1b38018   2
+		y2   0x1b383c8   2
 
 
 	Childs: 3
-	newline
-	writeInteger
-	writeString
+	fun - 3
+		a
+		x
+		y
+	writeInteger - 0
+	writeString - 0
 
-	Locals: 1
-	writeInteger   0x1f2a1f8
-
-	Local Functions: 9
-	newline - newline
-	readByte - readByte
-	readChar - readChar
-	readInteger - readInteger
-	readString - readString
-	writeByte - writeByte
-	writeChar - writeChar
-	writeInteger - writeInteger
-	writeString - writeString.1
+	symbol_table: 18
+	a   0x1b36388   1
+	extend   0x1b34fe8   0
+	fun   0x1b370e8   1
+	readByte   0x1b34c88   0
+	readChar   0x1b34da8   0
+	readInteger   0x1b34b68   0
+	readString   0x1b34ec8   0
+	shrink   0x1b35248   0
+	strcat   0x1b34578   0
+	strcmp   0x1b355b8   0
+	strcpy   0x1b356c8   0
+	strlen   0x1b354a8   0
+	writeByte   0x1b34638   0
+	writeChar   0x1b34928   0
+	writeInteger   0x1b34028   0
+	writeString   0x1b34a48   0
+	x   0x1b36ae8   1
+	y   0x1b36bf8   1
 

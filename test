@@ -1,10 +1,26 @@
-main () : proc
-   newline () : proc { writeString("\n"); }
-   writeString (i : int) : proc { writeInteger(i); }
-   writeInteger : int;
+main() : proc
+   a: int[2];
+   x: int[10];
+   y: int[10];
+   z: int[40];
+   fun( x: reference int[], y: reference int[]) : proc {
+      x[0] = 1;
+      x[1] = 1;
+      x[2] = 1;
+
+      y[0] = 2;
+      y[1] = 2;
+      y[2] = 2;
+      writeInteger(x[0]);
+      writeInteger(x[1]);
+      writeString("\n");
+      writeInteger(y[0]);
+      writeString("\n");
+   }
 {
-   writeInteger = 42;
-   writeString(writeInteger);
-   newline();
-   writeInteger(500);
+   fun(x, y);
+   a[100] = 1;
+   writeInteger(1);
+   writeString("\n");
+   return;
 }

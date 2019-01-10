@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <stack>
+#include <tuple>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm-c/Types.h>
@@ -26,7 +27,12 @@ class Scope
 
 private:
   int id;
-  std::map<std::string, std::pair<std::string, Value *>> symbol_table;
+  // std::map<std::string, std::tuple<std::string, Value *, int>> symbol_table;
+
+  std::map<std::string, std::tuple<std::string, Value *, int>> symbol_table;
+
+
+
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> inherited;
 
 public:
@@ -35,10 +41,11 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
 
-  std::map<std::string, std::pair<std::string, Value *>> &getSymbolTable() { return symbol_table; }
+  std::map<std::string, std::tuple<std::string, Value *, int>> &getSymbolTable() { return symbol_table; }
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &getInherited() { return inherited; }
 
   void setId(int n) { id = n; }
+  int getId() { return id; }
   Function *getFunction() { return fun; }
 };
 
@@ -50,9 +57,10 @@ class Scopes
 public:
   int id = 0;
   Scopes() {}
-  std::map<std::string, std::pair<std::string, Value *>> &symbol_table() { return functions.top()->getSymbolTable(); }
+  std::map<std::string, std::tuple<std::string, Value *, int>> &symbol_table() { return functions.top()->getSymbolTable(); }
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &inherited() { return functions.top()->getInherited(); }
   BasicBlock *currentBlock() { return functions.top()->block; }
+  int getScopeId() { return functions.top()->getId(); }
   void pushBlock(BasicBlock *block, Function *f)
   {
     functions.push(new Scope());
@@ -338,13 +346,14 @@ public:
 // This class captures: name, argument names and return type of a function.
 class PrototypeAST
 {
+  int argsize;
   Type *t;
   std::string Name;
   std::vector<std::pair<std::string, Type *>> Args;
 
 public:
   PrototypeAST(Type *t, const std::string &name, std::vector<std::pair<std::string, Type *>> Args) : t(t), Name(name), Args(std::move(Args)) {}
-
+  int getArgsSize() { return argsize; }
   Function *codegen();
   const std::string &getName() const { return Name; }
   Type *getType() { return t; }

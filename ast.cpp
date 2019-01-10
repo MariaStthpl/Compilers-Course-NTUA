@@ -304,7 +304,7 @@ Type *CharConst_ExprAST::getT()
 Value *Id_ExprAST::codegen()
 {
   // Look this variable up in the function.
-  AllocaInst *V = cast<AllocaInst>(context.symbol_table()[Name].second);
+  AllocaInst *V = cast<AllocaInst>(std::get<1>(context.symbol_table()[Name]));
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
@@ -350,14 +350,14 @@ Value *Id_ExprAST::codegen()
 
 Type *Id_ExprAST::getT()
 {
-  Value *V = context.symbol_table()[Name].second;
+  Value *V = std::get<1>(context.symbol_table()[Name]);
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
     exit(1);
   }
 
-  Type *idT = (context.symbol_table()[Name].second)->getType()->getPointerElementType();
+  Type *idT = (std::get<1>(context.symbol_table()[Name]))->getType()->getPointerElementType();
   // return idT->getPointerElementType();
   if (PointerType::classof(idT))
   {
@@ -376,7 +376,7 @@ Type *Id_ExprAST::getT()
 Value *ArrayElement_ExprAST::codegen()
 {
 
-  AllocaInst *arr = cast<AllocaInst>(context.symbol_table()[Name].second);
+  AllocaInst *arr = cast<AllocaInst>(std::get<1>(context.symbol_table()[Name]));
   if (!arr)
   {
     LogError("Unknown array name: " + Name);
@@ -422,7 +422,7 @@ Value *ArrayElement_ExprAST::codegen()
 Type *ArrayElement_ExprAST::getT()
 {
   TypeCheck();
-  Type *idT = (context.symbol_table()[Name].second)->getType()->getPointerElementType();
+  Type *idT = (std::get<1>(context.symbol_table()[Name]))->getType()->getPointerElementType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
@@ -438,7 +438,7 @@ Type *ArrayElement_ExprAST::getT()
 
 void ArrayElement_ExprAST::TypeCheck()
 {
-  AllocaInst *arr = cast<AllocaInst>(context.symbol_table()[Name].second);
+  AllocaInst *arr = cast<AllocaInst>(std::get<1>(context.symbol_table()[Name]));
   Type *arrT = arr->getType();
   if (!ArrayType::classof(arrT) && !(PointerType::classof(arrT)))
   {
@@ -704,7 +704,7 @@ Value *FuncCall::codegen()
   TypeCheck();
 
   // Look up the name in the global module table.
-  Function *CalleeF = dyn_cast<Function>(context.symbol_table()[Callee].second); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = dyn_cast<Function>(std::get<1>(context.symbol_table()[Callee])); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
@@ -719,21 +719,32 @@ Value *FuncCall::codegen()
       return nullptr;
   }
 
-  for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
+    for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
   {
-    if (PointerType::classof(((it->second).second)->getAllocatedType()))
+    // std::get<1>(context.symbol_table()[Name])
+        // std::get<1>(context.symbol_table()[Name])
+    if (PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()) && PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()->getPointerElementType()))
+    {
+      LoadInst *ldinst = Builder.CreateLoad(std::get<1>(context.symbol_table()[it->first]), it->first);
+      ArgsV.push_back(ldinst);
+      // indexList.push_back(c16(0));
+      // GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.symbol_table()[it->first].second)->getType(), (context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList),  it->first, Builder.GetInsertBlock());
+      // LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
+      // ArgsV.push_back(ldinst);
+    }
+    else if (PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()))
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((it->second).second)->getAllocatedType(), (it->second).second, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
-      LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
-      ArgsV.push_back(ldinst);
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(std::get<1>(context.symbol_table()[it->first])->getType()->getPointerElementType(), std::get<1>(context.symbol_table()[it->first]), ArrayRef<Value *>(indexList),  it->first, Builder.GetInsertBlock());
+      // LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
+      ArgsV.push_back(gepInst);
     }
     else
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((it->second).second)->getAllocatedType(), (it->second).second, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(std::get<1>(context.symbol_table()[it->first])->getType(), std::get<1>(context.symbol_table()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
   }
@@ -742,14 +753,14 @@ Value *FuncCall::codegen()
 
 Type *FuncCall::getT()
 {
-  Function *CalleeF = TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = TheModule->getFunction(((std::get<0>(context.symbol_table()[Callee]))));
   return CalleeF->getFunctionType()->getReturnType();
 }
 
 void FuncCall::TypeCheck()
 {
   // Look up the name in the global module table.
-  Function *CalleeF = dyn_cast<Function>(context.symbol_table()[Callee].second); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = dyn_cast<Function>(std::get<1>(context.symbol_table()[Callee])); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
   if (!CalleeF)
   {
     LogError("Unknown function referenced: " + Callee);
@@ -766,7 +777,6 @@ void FuncCall::TypeCheck()
   FunctionType *FTy = CalleeF->getFunctionType();
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
   {
-    myfile << " ARG " << std::endl;
     if (PointerType::classof(FTy->getParamType(i)))
     {
       if (!dynamic_cast<Id_ExprAST *>(Args[i]) && !dynamic_cast<StringLiteral_ExprAST *>(Args[i]))
@@ -913,6 +923,7 @@ void Return_Stmt::TypeCheck()
 
 Function *PrototypeAST::codegen()
 {
+  argsize = Args.size();
   /* pass previous variables as pointers */
   if (context.id > 0)
     for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.getTop())->getInherited()[Name].begin(); it != (context.getTop())->getInherited()[Name].end(); ++it)
@@ -957,7 +968,20 @@ Value *FuncBody_AST::codegen()
 
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
-      context.symbol_table()[VarName] = std::pair<std::string, Value *>(VarName, Alloca);
+      // std::tuple<std::string, Value *, int> locals = context.symbol_table()[VarName];
+      if ( (context.symbol_table()).find(VarName) != (context.symbol_table()).end() ) {
+        myfile << "TRYing to redefine variable " << VarName << std::endl;
+
+        //check that function is defined only in higher scope and not the current one
+        if ( !(std::get<2>(context.symbol_table()[VarName]) < context.getScopeId()) ) {
+          myfile << "WTF" << VarName << std::endl;
+          LogError("Cannot redefine variable in scope: " + std::to_string(context.getScopeId()) + " Variable Name is: " + VarName);
+          LogError("declared in scope: " + std::to_string(std::get<2>(context.symbol_table()[VarName])) + " Variable Name is: " + VarName);
+          exit(1);
+        }
+      }
+        
+      context.symbol_table()[VarName] = std::tuple<std::string, Value *, int>(VarName, Alloca, context.getScopeId());//std::pair<std::string, Value *>(VarName, Alloca);
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -965,15 +989,29 @@ Value *FuncBody_AST::codegen()
       FunctionAST *temp = dynamic_cast<FunctionAST *>(VarNames[i]);
       Builder.SetInsertPoint(context.currentBlock());
 
+      const std::string &FuncName = temp->Proto->getName();
+
+      // std::tuple<std::string, Value *, int> locals = context.symbol_table()[FuncName];
+      if ( (context.symbol_table()).find(FuncName) != (context.symbol_table()).end() ) {
+        myfile << "TRYing to redefine function " << FuncName << std::endl;
+
+        //check that function is defined only in higher scope and not the current one
+        if ( !(std::get<2>(context.symbol_table()[FuncName]) < context.getScopeId()) ) {
+          myfile << "WTF" << FuncName << std::endl;
+          LogError("Cannot redefine function in same scope. Function Name is: " + FuncName);
+          exit(1);
+        }
+      }
+
       /* save var defs so far */
-      for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
+      for (std::map<std::string, std::tuple<std::string, Value *, int>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
       {
-        if (dyn_cast<AllocaInst>((it->second).second))
-          ((context.inherited()[(temp->Proto->getName()).c_str()])[it->first]) = (std::pair<Type *, AllocaInst *>(PointerType::getUnqual(cast<AllocaInst>((it->second).second)->getAllocatedType()), cast<AllocaInst>((it->second).second)));
+        if (dyn_cast<AllocaInst>(std::get<1>(it->second)))
+          ((context.inherited()[FuncName])[it->first]) = (std::pair<Type *, AllocaInst *>(PointerType::getUnqual(cast<AllocaInst>(std::get<1>(it->second))->getAllocatedType()), cast<AllocaInst>(std::get<1>(it->second))));
       }
 
       Function *fun = temp->codegen();
-      context.symbol_table()[(temp->Proto->getName())] = std::pair<std::string, Value *>(fun->getName(), fun);
+      context.symbol_table()[FuncName] = std::tuple<std::string, Value *, int>(fun->getName(), fun, context.getScopeId());//std::pair<std::string, Value *>(fun->getName(), fun);
 
       Builder.SetInsertPoint(context.currentBlock());
     }
@@ -1011,32 +1049,30 @@ Function *FunctionAST::codegen()
 
   if (context.id == 1)
   {
-    context.symbol_table()["writeInteger"] = std::pair<std::string, Value *>("writeInteger", TheModule->getFunction("writeInteger"));
-    context.symbol_table()["writeChar"] = std::pair<std::string, Value *>("writeChar", TheModule->getFunction("writeChar"));
-    context.symbol_table()["writeByte"] = std::pair<std::string, Value *>("writeByte", TheModule->getFunction("writeByte"));
-    context.symbol_table()["writeString"] = std::pair<std::string, Value *>("writeString", TheModule->getFunction("writeString"));
-
-    context.symbol_table()["readInteger"] = std::pair<std::string, Value *>("readInteger", TheModule->getFunction("readInteger"));
-    context.symbol_table()["readByte"] = std::pair<std::string, Value *>("readByte", TheModule->getFunction("readByte"));
-    context.symbol_table()["readChar"] = std::pair<std::string, Value *>("readChar", TheModule->getFunction("readChar"));
-    context.symbol_table()["readString"] = std::pair<std::string, Value *>("readString", TheModule->getFunction("readString"));
-
-    context.symbol_table()["extend"] = std::pair<std::string, Value *>("extend", TheModule->getFunction("extend"));
-    context.symbol_table()["shrink"] = std::pair<std::string, Value *>("shrink", TheModule->getFunction("shrink"));
-
-    context.symbol_table()["strlen"] = std::pair<std::string, Value *>("strlen", TheModule->getFunction("strlen"));
-    context.symbol_table()["strcmp"] = std::pair<std::string, Value *>("strcmp", TheModule->getFunction("strcmp"));
-    context.symbol_table()["strcpy"] = std::pair<std::string, Value *>("strcpy", TheModule->getFunction("strcpy"));
-    context.symbol_table()["strcat"] = std::pair<std::string, Value *>("strcat", TheModule->getFunction("strcat"));
+    context.symbol_table()["writeInteger"] = std::tuple<std::string, Value *, int>("writeInteger", TheModule->getFunction("writeInteger"), 0);
+    context.symbol_table()["writeChar"] = std::tuple<std::string, Value *, int>("writeChar", TheModule->getFunction("writeChar"), 0);
+    context.symbol_table()["writeByte"] = std::tuple<std::string, Value *, int>("writeByte", TheModule->getFunction("writeByte"), 0);
+    context.symbol_table()["writeString"] = std::tuple<std::string, Value *, int>("writeString", TheModule->getFunction("writeString"), 0);
+    context.symbol_table()["readInteger"] = std::tuple<std::string, Value *, int>("readInteger", TheModule->getFunction("readInteger"), 0);
+    context.symbol_table()["readByte"] = std::tuple<std::string, Value *, int>("readByte", TheModule->getFunction("readByte"), 0);
+    context.symbol_table()["readChar"] = std::tuple<std::string, Value *, int>("readChar", TheModule->getFunction("readChar"), 0);
+    context.symbol_table()["readString"] = std::tuple<std::string, Value *, int>("readString", TheModule->getFunction("readString"), 0);
+    context.symbol_table()["extend"] = std::tuple<std::string, Value *, int>("extend", TheModule->getFunction("extend"), 0);
+    context.symbol_table()["shrink"] = std::tuple<std::string, Value *, int>("shrink", TheModule->getFunction("shrink"), 0);
+    context.symbol_table()["strlen"] = std::tuple<std::string, Value *, int>("strlen", TheModule->getFunction("strlen"), 0);
+    context.symbol_table()["strcmp"] = std::tuple<std::string, Value *, int>("strcmp", TheModule->getFunction("strcmp"), 0);
+    context.symbol_table()["strcpy"] = std::tuple<std::string, Value *, int>("strcpy", TheModule->getFunction("strcpy"), 0);
+    context.symbol_table()["strcat"] = std::tuple<std::string, Value *, int>("strcat", TheModule->getFunction("strcat"), 0);
   }
 
   if (context.id > 1)
   {
     context.inherited() = prev->getInherited();
     context.symbol_table() = prev->getSymbolTable();
-    context.symbol_table()[Proto->getName()] = std::pair<std::string, Value *>(TheFunction->getName(), TheFunction); //pushes itself on local definitions
+    context.symbol_table()[Proto->getName()] = std::tuple<std::string, Value *, int>(TheFunction->getName(), TheFunction, context.getScopeId()-1); //pushes itself on local definitions
   }
 
+  int counter = 0;
   for (auto &Arg : TheFunction->args())
   {
     // Create an alloca for this variable
@@ -1044,7 +1080,10 @@ Function *FunctionAST::codegen()
     // Store the initial value into alloca
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
-    context.symbol_table()[Arg.getName()] = std::pair<std::string, Value *>(Arg.getName(), Alloca);
+    if ( counter < Proto->getArgsSize() )
+    context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int>(Arg.getName(), Alloca, context.getScopeId());
+    else 
+    context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int>(Arg.getName(), Alloca, context.getScopeId() - 1);
   }
 
   Body->codegen();
@@ -1072,11 +1111,11 @@ Function *FunctionAST::codegen()
     myfile << "\t";
   myfile << "symbol_table: " << context.symbol_table().size() << std::endl;
 
-  for (std::map<std::string, std::pair<std::string, Value *>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
+  for (std::map<std::string, std::tuple<std::string, Value *, int>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
   {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << (it->first) << "   " << (it->second).second << std::endl;
+    myfile << (it->first) << "   " << std::get<1>(it->second) << "   " << std::to_string(std::get<2>(it->second)) << std::endl;
   }
   myfile << "\n";
 

@@ -127,7 +127,7 @@ func_body:
 ;
 
 fpar_def:
-  T_id ':' type                       { $$ = new std::pair<std::string, Type*>(*$1, $3); }
+  T_id ':' data_type                  { $$ = new std::pair<std::string, Type*>(*$1, $3); }
 | T_id ':' TREFERENCE type            { $$ = new std::pair<std::string, Type*>(*$1, PointerType::getUnqual($4)); }
 ;
 
