@@ -28,11 +28,10 @@ class Scope
 private:
   int id;
   // std::map<std::string, std::tuple<std::string, Value *, int>> symbol_table;
-
-  std::map<std::string, std::tuple<std::string, Value *, int>> symbol_table;
-
-
-
+  // symbol table
+  // variable/function name -> { new variable/function name, Pointer, definition's scope, array of variable }
+  // 0-variable, 1-array, 2-function
+  std::map<std::string, std::tuple<std::string, Value *, int, int>> symbol_table;
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> inherited;
 
 public:
@@ -41,7 +40,7 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
 
-  std::map<std::string, std::tuple<std::string, Value *, int>> &getSymbolTable() { return symbol_table; }
+  std::map<std::string, std::tuple<std::string, Value *, int, int>> &getSymbolTable() { return symbol_table; }
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &getInherited() { return inherited; }
 
   void setId(int n) { id = n; }
@@ -57,7 +56,7 @@ class Scopes
 public:
   int id = 0;
   Scopes() {}
-  std::map<std::string, std::tuple<std::string, Value *, int>> &symbol_table() { return functions.top()->getSymbolTable(); }
+  std::map<std::string, std::tuple<std::string, Value *, int, int>> &symbol_table() { return functions.top()->getSymbolTable(); }
   std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &inherited() { return functions.top()->getInherited(); }
   BasicBlock *currentBlock() { return functions.top()->block; }
   int getScopeId() { return functions.top()->getId(); }
@@ -357,6 +356,7 @@ public:
   Function *codegen();
   const std::string &getName() const { return Name; }
   Type *getType() { return t; }
+  std::vector<std::pair<std::string, Type *>> getArgs() { return Args; }
   std::vector<Type *> getArgsTypes()
   {
     std::vector<Type *> argTypes;

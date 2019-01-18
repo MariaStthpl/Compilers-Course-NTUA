@@ -1,0 +1,8 @@
+rm: cannot remove 'a.out': No such file or directory
+
+Error: Return type of function f doesn't match definition type 
+
+/usr/bin/../lib/gcc/x86_64-linux-gnu/5.4.0/../../../x86_64-linux-gnu/crt1.o: In function `_start':
+(.text+0x20): undefined reference to `main'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+do.sh: 13: do.sh: ./a.out: not found
