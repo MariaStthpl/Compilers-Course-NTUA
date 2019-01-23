@@ -1,0 +1,6 @@
+main():proc
+{
+
+   writeString("HAHAH\n");
+   return;
+} 

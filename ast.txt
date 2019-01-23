@@ -1,3 +1,0 @@
-New function: main
-TRYing to redefine variable a
-WTFa

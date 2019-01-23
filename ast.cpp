@@ -65,8 +65,6 @@ void llvm_compile_and_dump(FunctionAST *t)
   TheModule = make_unique<Module>("alan program", TheContext);
   if (o_flag)
   {
-        std::cout << "OPT " << std::to_string(o_flag) << std::endl;
-
     TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
     TheFPM->add(createPromoteMemoryToRegisterPass());
     // TODO optimizations

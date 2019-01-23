@@ -3,12 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <iostream>
 #include <fstream>
 #include "ast.hpp"
 
 int o_flag, f_flag, i_flag;
 
 extern int yylex();
+extern FILE *yyin;
 void yyerror (const char *msg);
 
 extern int linenumber;
@@ -247,19 +249,77 @@ void yyerror (const char *msg) {
   exit(1);
 }
 
+
+
+/*
+Check string is end with extension/suffix
+*/
+int strEndWith(char* str, const char* suffix)
+{
+  size_t strLen = strlen(str);
+  size_t suffixLen = strlen(suffix);
+  if (suffixLen <= strLen) {
+    return strncmp(str + strLen - suffixLen, suffix, suffixLen) == 0;
+  }
+  return 0;
+}
+
+int create_imm(){
+
+  // Save fd of stdout
+  fpos_t pos;
+  fgetpos(stdout, &pos);
+  int fd = dup(fileno(stdout));
+
+  std::string imm_file = "temp.imm";
+  FILE *fp = freopen(imm_file.c_str(),"w+",stdout);
+  yyin = stdin;
+  // do{
+  //   yyparse();
+  // }while (!feof(yyin));
+
+  if ( yyparse() )  return 1;
+  
+  llvm_compile_and_dump(t);
+
+  //Flush stdout so any buffered messages are delivered
+  fflush(stdout);
+  //Close file and restore standard output to stdout - which should be the terminal
+  dup2(fd, fileno(stdout));
+  close(fd);
+
+  clearerr(stdout);
+  fsetpos(stdout, &pos);
+  return 0;
+}
+
+int create_asm() {
+  system("llc -filetype=asm --x86-asm-syntax=intel temp.imm -o temp.asm");
+  return 0;
+}
+
+int compile(std::string filename) {
+  create_imm();
+  create_asm();
+  system("llc -filetype=obj temp.imm -o temp.o");
+  std::string command("clang temp.o lib.a -o " + filename);
+  system(command.c_str());
+  system("rm temp.o");
+}
+
 int main(int argc, char **argv) {
-  if (argc == 0) {
+  int c;
+  if ( argc == 1 ) {
     fprintf(stdout,"Usage: alan [options] [FILE]\n"
             "Options:\n"
             "-O optimization flag: allows an O1 optimization over the parser generated ir-code, through llvm's \"opt\" executable\n"
-            "-i prints the - llvm \"*.ll\" ir  represantion of the input source code on stdout\n"
+            "-i prints the - llvm \"*.imm\" ir  represantion of the input source code on stdout\n"
             "-f prints the final code - assembly \"*.asm\" - of the input source code on stdout"
             "\n\n"
-            "When selecting options -i or -f the input must be given on stdin. Otherwise input must be given as \"FILE\"\n"
+            "When selecting options -i or -f the input must be given on stdin. Otherwise input must be given as \"FILE\" with .alan e\n"
             );
     exit(1);
   }
-  int c;
   o_flag = f_flag = i_flag = 0;
   while ( (c = getopt(argc, argv, "Ofi")) != -1 ) {
     switch (c) {
@@ -288,7 +348,41 @@ int main(int argc, char **argv) {
         break;
     }
   }
-  if (yyparse()) return 1;
-  llvm_compile_and_dump(t);
-  return 0;
+
+  // no i or f options given -> write to .imm and .asm files
+  if (i_flag==0 && f_flag==0) {
+    int j=1;
+    while(j<argc){
+      if(strEndWith(argv[j], ".alan")) {
+        // printf("compiling %s\n", argv[j]);
+
+        std::string text(argv[j]);
+        std::string filename(text.substr(0, text.find(".alan")));
+
+        FILE *myfile = freopen(argv[j], "r", stdin);
+        if (!myfile) {  
+          std::cout << "I can't open " <<  argv[j] << " file!" << std::endl;
+          return -1;
+        }
+        compile(filename);
+        std::string imm_file = filename+".imm";
+        std::string asm_file = filename+".asm";
+        std::string command("cp temp.imm " + imm_file);
+        system(command.c_str());
+        command = ("cp temp.asm " + asm_file);
+        system(command.c_str());
+        break;
+      }
+      j++;
+    }
+  }
+  if (i_flag || f_flag)
+    compile("a.out");
+  if (i_flag) {
+    system("cat temp.imm");
+  }
+  if(f_flag) {
+    system("cat temp.asm");
+  }
+  system("rm -f temp.imm temp.asm");
 }
