@@ -11,7 +11,7 @@ LDFLAGS=`llvm-config --ldflags --system-libs --libs all`
 CC=gcc
 CFLAGS=-Wall -g
 
-default: minibasic
+default: alan
 
 libs :
 	lib.a
@@ -31,11 +31,11 @@ ast.o: ast.cpp ast.hpp symbol.h general.h error.h
 # %.o: %.cpp
 # 	$(CXX) $(CXXFLAGS) -c $<
 
-minibasic: lexer.o parser.o ast.o general.o error.o
-	$(CXX) $(CXXFLAGS) -o minibasic $^ $(LDFLAGS) -lfl
+alan: lexer.o parser.o ast.o general.o error.o
+	$(CXX) $(CXXFLAGS) -o alan $^ $(LDFLAGS) -lfl
 
 clean:
-	$(RM) lexer.cpp parser.cpp parser.hpp parser.output a.* *.o *~ minibasic *.dot
+	$(RM) lexer.cpp parser.cpp parser.hpp parser.output a.* *.o *~ alan *.dot
 
 distclean: clean
-	$(RM) minibasic
+	$(RM) alan ast.txt debug

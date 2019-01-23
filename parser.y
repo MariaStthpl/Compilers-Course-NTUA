@@ -2,7 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fstream>
 #include "ast.hpp"
+
+int o_flag, f_flag, i_flag;
 
 extern int yylex();
 void yyerror (const char *msg);
@@ -243,7 +247,47 @@ void yyerror (const char *msg) {
   exit(1);
 }
 
-int main() {
+int main(int argc, char **argv) {
+  if (argc == 0) {
+    fprintf(stdout,"Usage: alan [options] [FILE]\n"
+            "Options:\n"
+            "-O optimization flag: allows an O1 optimization over the parser generated ir-code, through llvm's \"opt\" executable\n"
+            "-i prints the - llvm \"*.ll\" ir  represantion of the input source code on stdout\n"
+            "-f prints the final code - assembly \"*.asm\" - of the input source code on stdout"
+            "\n\n"
+            "When selecting options -i or -f the input must be given on stdin. Otherwise input must be given as \"FILE\"\n"
+            );
+    exit(1);
+  }
+  int c;
+  o_flag = f_flag = i_flag = 0;
+  while ( (c = getopt(argc, argv, "Ofi")) != -1 ) {
+    switch (c) {
+      case 'O':
+        if (o_flag) {
+          fprintf(stderr,"[ERROR]: Can't give the same flag more than once\n");
+          exit(1);
+        }
+        o_flag = 1;
+        break;
+      case 'f':
+        if (f_flag) {
+          fprintf(stderr,"[ERROR]: Can't give the same flag more than once\n");
+          exit(1);
+        }
+        f_flag = 1;
+        break;
+      case 'i':
+        if (i_flag) {
+          fprintf(stderr,"[ERROR]: Can't give the same flag more than once\n");
+          exit(1);
+        }
+        i_flag = 1;
+        break;
+      default:
+        break;
+    }
+  }
   if (yyparse()) return 1;
   llvm_compile_and_dump(t);
   return 0;

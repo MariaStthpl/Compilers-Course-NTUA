@@ -22,6 +22,8 @@
 
 using namespace llvm;
 
+extern int o_flag, f_flag, i_flag;
+
 class Scope
 {
 
@@ -32,7 +34,7 @@ private:
   // variable/function name -> { new variable/function name, Pointer, definition's scope, array of variable }
   // 0-variable, 1-array, 2-function
   std::map<std::string, std::tuple<std::string, Value *, int, int>> symbol_table;
-  std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> inherited;
+  std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> inherited;
 
 public:
   Function *fun;
@@ -41,7 +43,7 @@ public:
   Value *returnValue = nullptr;
 
   std::map<std::string, std::tuple<std::string, Value *, int, int>> &getSymbolTable() { return symbol_table; }
-  std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &getInherited() { return inherited; }
+  std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> &getInherited() { return inherited; }
 
   void setId(int n) { id = n; }
   int getId() { return id; }
@@ -57,7 +59,7 @@ public:
   int id = 0;
   Scopes() {}
   std::map<std::string, std::tuple<std::string, Value *, int, int>> &symbol_table() { return functions.top()->getSymbolTable(); }
-  std::map<std::string, std::map<std::string, std::pair<Type*, AllocaInst *>>> &inherited() { return functions.top()->getInherited(); }
+  std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> &inherited() { return functions.top()->getInherited(); }
   BasicBlock *currentBlock() { return functions.top()->block; }
   int getScopeId() { return functions.top()->getId(); }
   void pushBlock(BasicBlock *block, Function *f)

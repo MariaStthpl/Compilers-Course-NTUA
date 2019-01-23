@@ -63,20 +63,25 @@ void llvm_compile_and_dump(FunctionAST *t)
 
   // Initialize the module and the optimization passes.
   TheModule = make_unique<Module>("alan program", TheContext);
-  TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
-  // TheFPM->add(createPromoteMemoryToRegisterPass());
-  // TODO optimizations
-  // TheFPM->add(createGVNPass());
-  // TheFPM->add(createCFGSimplificationPass());
-  // TheFPM->add(createDeadCodeEliminationPass());
-  // TheFPM->add(createDeadInstEliminationPass());
-  // for (int i = 0; i < 5; ++i)
-  //   TheFPM->add(createDeadStoreEliminationPass());
-  // TheFPM->add(createInstructionCombiningPass());
-  // TheFPM->add(createReassociatePass());
-  // TheFPM->add(createGVNPass());
-  // TheFPM->add(createCFGSimplificationPass());
-  TheFPM->doInitialization();
+  if (o_flag)
+  {
+        std::cout << "OPT " << std::to_string(o_flag) << std::endl;
+
+    TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
+    TheFPM->add(createPromoteMemoryToRegisterPass());
+    // TODO optimizations
+    TheFPM->add(createGVNPass());
+    TheFPM->add(createCFGSimplificationPass());
+    TheFPM->add(createDeadCodeEliminationPass());
+    TheFPM->add(createDeadInstEliminationPass());
+    for (int i = 0; i < 5; ++i)
+      TheFPM->add(createDeadStoreEliminationPass());
+    TheFPM->add(createInstructionCombiningPass());
+    TheFPM->add(createReassociatePass());
+    TheFPM->add(createGVNPass());
+    TheFPM->add(createCFGSimplificationPass());
+    TheFPM->doInitialization();
+  }
 
   /* ---------------------------------------------------------------------------*/
   /*                    declare functions of runtime library                    */
@@ -234,7 +239,8 @@ void llvm_compile_and_dump(FunctionAST *t)
     TheModule->print(outs(), nullptr);
     return;
   }
-  TheFPM->run(*main_function);
+  if (o_flag)
+    TheFPM->run(*main_function);
   // Print out the IR.
   TheModule->print(outs(), nullptr);
 }
@@ -439,7 +445,7 @@ Type *ArrayElement_ExprAST::getT()
 void ArrayElement_ExprAST::TypeCheck()
 {
   int isarray = std::get<3>(context.symbol_table()[Name]);
-  if (isarray!=1)
+  if (isarray != 1)
   {
     LogError("Unknown array name: " + Name);
     exit(1);
@@ -987,11 +993,10 @@ Value *FuncBody_AST::codegen()
         }
       }
 
-      if ( t->isArrayTy() )
-      context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 1); //std::pair<std::string, Value *>(VarName, Alloca);
-      else 
-      context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 0); //std::pair<std::string, Value *>(VarName, Alloca);
-
+      if (t->isArrayTy())
+        context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 1); //std::pair<std::string, Value *>(VarName, Alloca);
+      else
+        context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 0); //std::pair<std::string, Value *>(VarName, Alloca);
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -1092,22 +1097,22 @@ Function *FunctionAST::codegen()
     // Store the initial value into alloca
     Builder.CreateStore(&Arg, Alloca);
     // Add arguments to variable symbol table
-    if (counter < Proto->getArgsSize()) {
-      if ( PointerType::classof((Proto->getArgs()[counter]).second) && PointerType::classof(((Proto->getArgs()[counter]).second)->getPointerElementType()) )
-      context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 1);
+    if (counter < Proto->getArgsSize())
+    {
+      if (PointerType::classof((Proto->getArgs()[counter]).second) && PointerType::classof(((Proto->getArgs()[counter]).second)->getPointerElementType()))
+        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 1);
       else
-      context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 0);
+        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 0);
     }
-    else {//Hidden arguments
-      if ( PointerType::classof(Arg.getType()) && ArrayType::classof(Arg.getType()->getPointerElementType()))
-      context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 1);
+    else
+    { //Hidden arguments
+      if (PointerType::classof(Arg.getType()) && ArrayType::classof(Arg.getType()->getPointerElementType()))
+        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 1);
       else
-      context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 0);
+        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 0);
     }
     counter++;
   }
-
-
 
   Body->codegen();
 
@@ -1155,7 +1160,8 @@ Function *FunctionAST::codegen()
 
   // Validate the generated code, checking for consistency.
   verifyFunction(*TheFunction);
-  TheFPM->run(*TheFunction);
+  if (o_flag)
+    TheFPM->run(*TheFunction);
   return TheFunction;
 
   // Error reading body, remove function.
