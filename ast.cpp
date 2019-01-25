@@ -67,7 +67,6 @@ void llvm_compile_and_dump(FunctionAST *t)
   {
     TheFPM = make_unique<legacy::FunctionPassManager>(TheModule.get());
     TheFPM->add(createPromoteMemoryToRegisterPass());
-    // TODO optimizations
     TheFPM->add(createGVNPass());
     TheFPM->add(createCFGSimplificationPass());
     TheFPM->add(createDeadCodeEliminationPass());
@@ -308,7 +307,7 @@ Type *CharConst_ExprAST::getT()
 Value *Id_ExprAST::codegen()
 {
   // Look this variable up in the function.
-  AllocaInst *V = cast<AllocaInst>(std::get<1>(context.symbol_table()[Name]));
+  AllocaInst *V = cast<AllocaInst>((*(context.symbol_table()[Name])).ptr);
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
@@ -354,15 +353,14 @@ Value *Id_ExprAST::codegen()
 
 Type *Id_ExprAST::getT()
 {
-  Value *V = std::get<1>(context.symbol_table()[Name]);
+  Value *V = (*(context.symbol_table()[Name])).ptr;
   if (!V)
   {
     LogError("Unknown variable name: " + Name);
     exit(1);
   }
 
-  Type *idT = (std::get<1>(context.symbol_table()[Name]))->getType()->getPointerElementType();
-  // return idT->getPointerElementType();
+  Type *idT = ((*(context.symbol_table()[Name])).ptr)->getType()->getPointerElementType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
@@ -379,8 +377,7 @@ Type *Id_ExprAST::getT()
 // IR for <id>[<expr>]
 Value *ArrayElement_ExprAST::codegen()
 {
-
-  AllocaInst *arr = cast<AllocaInst>(std::get<1>(context.symbol_table()[Name]));
+  AllocaInst *arr = cast<AllocaInst>((*(context.symbol_table()[Name])).ptr);
   if (!arr)
   {
     LogError("WTF Unknown array name: " + Name);
@@ -426,7 +423,7 @@ Value *ArrayElement_ExprAST::codegen()
 Type *ArrayElement_ExprAST::getT()
 {
   TypeCheck();
-  Type *idT = (std::get<1>(context.symbol_table()[Name]))->getType()->getPointerElementType();
+  Type *idT = ((*(context.symbol_table()[Name])).ptr)->getType()->getPointerElementType();
   if (PointerType::classof(idT))
   {
     if (ArrayType::classof(idT->getPointerElementType()))
@@ -442,7 +439,7 @@ Type *ArrayElement_ExprAST::getT()
 
 void ArrayElement_ExprAST::TypeCheck()
 {
-  int isarray = std::get<3>(context.symbol_table()[Name]);
+  int isarray = (*(context.symbol_table()[Name])).isarray;
   if (isarray != 1)
   {
     LogError("Unknown array name: " + Name);
@@ -653,27 +650,7 @@ Value *Assignment_StmtAST::codegen()
   // if r-value is pointer, load its value
   Val = loadValue(Val);
 
-  // special case: assign string_literal to array
-  // TODO assign array to array ???
-  if (StringLiteral_ExprAST *str = dynamic_cast<StringLiteral_ExprAST *>(RHS))
-  {
-    Id_ExprAST *idexpr = dynamic_cast<Id_ExprAST *>(LHS);
-    size_t i;
-    for (i = 1; i < str->getString().length() - 1; i++)
-    {
-      Assignment_StmtAST *assignelement = new Assignment_StmtAST(
-          new ArrayElement_ExprAST(idexpr->getName(), new IntConst_ExprAST(i - 1)),
-          new CharConst_ExprAST(str->getString()[i]));
-      assignelement->codegen();
-    }
-    Assignment_StmtAST *assignelement = new Assignment_StmtAST(
-        new ArrayElement_ExprAST(idexpr->getName(), new IntConst_ExprAST(i - 1)),
-        new CharConst_ExprAST('\0'));
-    assignelement->codegen();
-    return c8(0);
-  }
-  else
-    return Builder.CreateStore(Val, V);
+  return Builder.CreateStore(Val, V);
 }
 
 void Assignment_StmtAST::TypeCheck()
@@ -713,7 +690,7 @@ Value *FuncCall::codegen()
   TypeCheck();
 
   // Look up the name in the global module table.
-  Function *CalleeF = dyn_cast<Function>(std::get<1>(context.symbol_table()[Callee])); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
+  Function *CalleeF = dyn_cast<Function>((*(context.symbol_table()[Callee])).ptr);
 
   std::vector<Value *> ArgsV;
   FunctionType *FTy = CalleeF->getFunctionType();
@@ -731,28 +708,23 @@ Value *FuncCall::codegen()
   for (std::map<std::string, std::pair<Type *, AllocaInst *>>::iterator it = (context.inherited()[Callee]).begin(); it != (context.inherited()[Callee]).end(); ++it)
   //Passing pointers to hidden arguments
   {
-    if (PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()) && PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()->getPointerElementType()))
+    if (PointerType::classof(((*(context.symbol_table()[it->first])).ptr)->getType()) && PointerType::classof(((*(context.symbol_table()[it->first])).ptr)->getType()->getPointerElementType()))
     {
-      LoadInst *ldinst = Builder.CreateLoad(std::get<1>(context.symbol_table()[it->first]), it->first);
+      LoadInst *ldinst = Builder.CreateLoad((*(context.symbol_table()[it->first])).ptr, it->first);
       ArgsV.push_back(ldinst);
-      // indexList.push_back(c16(0));
-      // GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds((context.symbol_table()[it->first].second)->getType(), (context.symbol_table()[it->first].second), ArrayRef<Value *>(indexList),  it->first, Builder.GetInsertBlock());
-      // LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
-      // ArgsV.push_back(ldinst);
     }
-    else if (PointerType::classof((std::get<1>(context.symbol_table()[it->first]))->getType()))
+    else if (PointerType::classof(((*(context.symbol_table()[it->first])).ptr)->getType()))
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(std::get<1>(context.symbol_table()[it->first])->getType()->getPointerElementType(), std::get<1>(context.symbol_table()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
-      // LoadInst *ldinst = Builder.CreateLoad(gepInst, it->first);
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((*(context.symbol_table()[it->first])).ptr)->getType()->getPointerElementType(), (*(context.symbol_table()[it->first])).ptr, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
     else
     {
       std::vector<Value *> indexList;
       indexList.push_back(c16(0));
-      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(std::get<1>(context.symbol_table()[it->first])->getType(), std::get<1>(context.symbol_table()[it->first]), ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
+      GetElementPtrInst *gepInst = GetElementPtrInst::CreateInBounds(((*(context.symbol_table()[it->first])).ptr)->getType(), (*(context.symbol_table()[it->first])).ptr, ArrayRef<Value *>(indexList), it->first, Builder.GetInsertBlock());
       ArgsV.push_back(gepInst);
     }
   }
@@ -761,14 +733,21 @@ Value *FuncCall::codegen()
 
 Type *FuncCall::getT()
 {
-  Function *CalleeF = TheModule->getFunction(((std::get<0>(context.symbol_table()[Callee]))));
+  Function *CalleeF = TheModule->getFunction((*(context.symbol_table()[Callee])).new_name);
   return CalleeF->getFunctionType()->getReturnType();
 }
 
 void FuncCall::TypeCheck()
 {
   // Look up the name in the global module table.
-  Function *CalleeF = dyn_cast<Function>(std::get<1>(context.symbol_table()[Callee])); //TheModule->getFunction(((context.symbol_table()[Callee]).first));
+
+  if (!(context.symbol_table()[Callee]))
+  {
+    LogError("Unknown function referenced: " + Callee);
+    exit(1);
+  }
+
+  Function *CalleeF = dyn_cast<Function>((*(context.symbol_table()[Callee])).ptr);
   if (!CalleeF)
   {
     LogError("Unknown function referenced: " + Callee);
@@ -783,22 +762,66 @@ void FuncCall::TypeCheck()
   }
 
   FunctionType *FTy = CalleeF->getFunctionType();
-  for (unsigned i = 0, e = Args.size(); i != e; ++i)
+
+  std::vector<int> fp = ((*(context.symbol_table()[Callee])).function_parameters);
+  for (std::size_t k = 0; k < fp.size(); ++k)
   {
-    if (PointerType::classof(FTy->getParamType(i)))
+    // variable
+    if (fp[k] == 0)
     {
-      if (!dynamic_cast<Id_ExprAST *>(Args[i]) && !dynamic_cast<ArrayElement_ExprAST *>(Args[i]) && !dynamic_cast<StringLiteral_ExprAST *>(Args[i]))
+      // pass variable by reference
+      if (PointerType::classof(FTy->getParamType(k)))
+        if (!dynamic_cast<Id_ExprAST *>(Args[k]) && !dynamic_cast<ArrayElement_ExprAST *>(Args[k]))
+        {
+          LogError("Calling function with wrong argument type, arg no: " + std::to_string(k + 1) + " :expected identifier");
+          exit(1);
+        }
+      Type *tempType = Args[k]->getT();
+      if (PointerType::classof(tempType))
+        tempType = tempType->getPointerElementType();
+      Type *paramType = FTy->getParamType(k);
+      if (PointerType::classof(paramType))
+        paramType = paramType->getPointerElementType();
+      if (tempType != paramType)
       {
-        LogError("Calling function with wrong argument type, arg no: " + std::to_string(i + 1));
+        LogError("Calling function with wrong argument type, arg no: " + std::to_string(k + 1));
         exit(1);
       }
     }
+    // array
     else
     {
-      if (Args[i]->getT() != FTy->getParamType(i))
+      Id_ExprAST *temp = dynamic_cast<Id_ExprAST *>(Args[k]);
+      if (!temp)
       {
-        LogError("Calling function with wrong argument type, arg no: " + std::to_string(i + 1));
-        exit(1);
+        StringLiteral_ExprAST *temp_sl = dynamic_cast<StringLiteral_ExprAST *>(Args[k]);
+        if (!temp_sl)
+        {
+          LogError("Calling function with wrong argument type, arg no: " + std::to_string(k + 1) + " :array expected");
+          exit(1);
+        }
+      }
+      else
+      {
+        if ((*context.symbol_table()[temp->getName()]).isarray != 1)
+        {
+          LogError("Calling function with wrong argument type, arg no: " + std::to_string(k + 1) + " :array expected");
+          exit(1);
+        }
+        // Check Array Type Mismatch
+        else if ((*context.symbol_table()[temp->getName()]).isarray == 1)
+        {
+          Type *tempType = temp->getT();
+          if (PointerType::classof(temp->getT()))
+            tempType = tempType->getPointerElementType();
+          else if (ArrayType::classof(temp->getT()))
+            tempType = tempType->getArrayElementType();
+          if (tempType != FTy->getParamType(k)->getPointerElementType())
+          {
+            LogError("Calling function with wrong argument type, arg no: " + std::to_string(k + 1) + " :arrays not of same type");
+            exit(1);
+          }
+        }
       }
     }
   }
@@ -898,7 +921,6 @@ Value *Return_Stmt::codegen()
       ReturnInst::Create(TheContext, context.getCurrentReturnValue(), Builder.GetInsertBlock());
     return c32(0);
   }
-
   Value *returnValue = expr->codegen();
   returnValue = loadValue(returnValue);
   context.setCurrentReturnValue(returnValue);
@@ -910,7 +932,6 @@ Value *Return_Stmt::codegen()
 void Return_Stmt::TypeCheck()
 {
   Type *ret = context.getTop()->getFunction()->getFunctionType()->getReturnType();
-
   if (!expr)
   {
     if (!(ret->isVoidTy()))
@@ -976,25 +997,19 @@ Value *FuncBody_AST::codegen()
 
       AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName, t);
 
-      // std::tuple<std::string, Value *, int> locals = context.symbol_table()[VarName];
       if ((context.symbol_table()).find(VarName) != (context.symbol_table()).end())
       {
-        myfile << "TRYing to redefine variable " << VarName << std::endl;
-
         //check that function is defined only in higher scope and not the current one
-        if (!(std::get<2>(context.symbol_table()[VarName]) < context.getScopeId()))
+        if (!(((*(context.symbol_table()[VarName])).definition_scope) < context.getScopeId()))
         {
-          myfile << "WTF" << VarName << std::endl;
-          LogError("Cannot redefine variable in scope: " + std::to_string(context.getScopeId()) + " Variable Name is: " + VarName);
-          LogError("declared in scope: " + std::to_string(std::get<2>(context.symbol_table()[VarName])) + " Variable Name is: " + VarName);
+          LogError("Cannot redefine variable in same scope, Variable Name is: " + VarName);
           exit(1);
         }
       }
-
       if (t->isArrayTy())
-        context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 1); //std::pair<std::string, Value *>(VarName, Alloca);
+        context.symbol_table()[VarName] = new declarations(VarName, Alloca, context.getScopeId(), 1, std::vector<int>()); //std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 1); //std::pair<std::string, Value *>(VarName, Alloca);
       else
-        context.symbol_table()[VarName] = std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 0); //std::pair<std::string, Value *>(VarName, Alloca);
+        context.symbol_table()[VarName] = new declarations(VarName, Alloca, context.getScopeId(), 0, std::vector<int>()); //std::tuple<std::string, Value *, int, int>(VarName, Alloca, context.getScopeId(), 0); //std::pair<std::string, Value *>(VarName, Alloca);
     }
     // <func-def>
     else if (dynamic_cast<FunctionAST *>(VarNames[i]) != nullptr)
@@ -1003,30 +1018,26 @@ Value *FuncBody_AST::codegen()
       Builder.SetInsertPoint(context.currentBlock());
 
       const std::string &FuncName = temp->Proto->getName();
-
-      // std::tuple<std::string, Value *, int> locals = context.symbol_table()[FuncName];
       if ((context.symbol_table()).find(FuncName) != (context.symbol_table()).end())
       {
-        myfile << "TRYing to redefine function " << FuncName << std::endl;
-
         //check that function is defined only in higher scope and not the current one
-        if (!(std::get<2>(context.symbol_table()[FuncName]) < context.getScopeId()))
+        if (!(((*(context.symbol_table()[FuncName])).definition_scope) < context.getScopeId()))
         {
-          myfile << "WTF" << FuncName << std::endl;
           LogError("Cannot redefine function in same scope. Function Name is: " + FuncName);
           exit(1);
         }
       }
 
       /* save var defs so far */
-      for (std::map<std::string, std::tuple<std::string, Value *, int, int>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
+      for (std::map<std::string, declarations *>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
       {
-        if (dyn_cast<AllocaInst>(std::get<1>(it->second)))
-          ((context.inherited()[FuncName])[it->first]) = (std::pair<Type *, AllocaInst *>(PointerType::getUnqual(cast<AllocaInst>(std::get<1>(it->second))->getAllocatedType()), cast<AllocaInst>(std::get<1>(it->second))));
+        if (it->second)
+          if (dyn_cast<AllocaInst>((*(it->second)).ptr))
+            ((context.inherited()[FuncName])[it->first]) = (std::pair<Type *, AllocaInst *>(PointerType::getUnqual(cast<AllocaInst>((*(it->second)).ptr)->getAllocatedType()), cast<AllocaInst>((*(it->second)).ptr)));
       }
 
       Function *fun = temp->codegen();
-      context.symbol_table()[FuncName] = std::tuple<std::string, Value *, int, int>(fun->getName(), fun, context.getScopeId(), 2); //std::pair<std::string, Value *>(fun->getName(), fun);
+      context.symbol_table()[FuncName] = new declarations(fun->getName(), fun, context.getScopeId(), 2, temp->Proto->ArgsIsArrays());
 
       Builder.SetInsertPoint(context.currentBlock());
     }
@@ -1058,33 +1069,33 @@ Function *FunctionAST::codegen()
   if (context.id > 0)
     prev = context.getTop();
   context.pushBlock(BB, TheFunction);
-  // if (context.id > 0) // main can call itself?
   context.setPrev(prev);
   Builder.SetInsertPoint(context.currentBlock());
 
   if (context.id == 1)
   {
-    context.symbol_table()["writeInteger"] = std::tuple<std::string, Value *, int, int>("writeInteger", TheModule->getFunction("writeInteger"), 0, 2);
-    context.symbol_table()["writeChar"] = std::tuple<std::string, Value *, int, int>("writeChar", TheModule->getFunction("writeChar"), 0, 2);
-    context.symbol_table()["writeByte"] = std::tuple<std::string, Value *, int, int>("writeByte", TheModule->getFunction("writeByte"), 0, 2);
-    context.symbol_table()["writeString"] = std::tuple<std::string, Value *, int, int>("writeString", TheModule->getFunction("writeString"), 0, 2);
-    context.symbol_table()["readInteger"] = std::tuple<std::string, Value *, int, int>("readInteger", TheModule->getFunction("readInteger"), 0, 2);
-    context.symbol_table()["readByte"] = std::tuple<std::string, Value *, int, int>("readByte", TheModule->getFunction("readByte"), 0, 2);
-    context.symbol_table()["readChar"] = std::tuple<std::string, Value *, int, int>("readChar", TheModule->getFunction("readChar"), 0, 2);
-    context.symbol_table()["readString"] = std::tuple<std::string, Value *, int, int>("readString", TheModule->getFunction("readString"), 0, 2);
-    context.symbol_table()["extend"] = std::tuple<std::string, Value *, int, int>("extend", TheModule->getFunction("extend"), 0, 2);
-    context.symbol_table()["shrink"] = std::tuple<std::string, Value *, int, int>("shrink", TheModule->getFunction("shrink"), 0, 2);
-    context.symbol_table()["strlen"] = std::tuple<std::string, Value *, int, int>("strlen", TheModule->getFunction("strlen"), 0, 2);
-    context.symbol_table()["strcmp"] = std::tuple<std::string, Value *, int, int>("strcmp", TheModule->getFunction("strcmp"), 0, 2);
-    context.symbol_table()["strcpy"] = std::tuple<std::string, Value *, int, int>("strcpy", TheModule->getFunction("strcpy"), 0, 2);
-    context.symbol_table()["strcat"] = std::tuple<std::string, Value *, int, int>("strcat", TheModule->getFunction("strcat"), 0, 2);
+    context.symbol_table()["writeInteger"] = new declarations("writeInteger", TheModule->getFunction("writeInteger"), 0, 2, {0});
+    context.symbol_table()["writeChar"] = new declarations("writeChar", TheModule->getFunction("writeChar"), 0, 2, {0});
+    context.symbol_table()["writeByte"] = new declarations("writeByte", TheModule->getFunction("writeByte"), 0, 2, {0});
+    context.symbol_table()["writeString"] = new declarations("writeString", TheModule->getFunction("writeString"), 0, 2, {1});
+    context.symbol_table()["readInteger"] = new declarations("readInteger", TheModule->getFunction("readInteger"), 0, 2, std::vector<int>());
+    context.symbol_table()["readByte"] = new declarations("readByte", TheModule->getFunction("readByte"), 0, 2, std::vector<int>());
+    context.symbol_table()["readChar"] = new declarations("readChar", TheModule->getFunction("readChar"), 0, 2, std::vector<int>());
+    context.symbol_table()["readString"] = new declarations("readString", TheModule->getFunction("readString"), 0, 2, {0, 1});
+    context.symbol_table()["extend"] = new declarations("extend", TheModule->getFunction("extend"), 0, 2, {0});
+    context.symbol_table()["shrink"] = new declarations("shrink", TheModule->getFunction("shrink"), 0, 2, {0});
+    context.symbol_table()["strlen"] = new declarations("strlen", TheModule->getFunction("strlen"), 0, 2, {1});
+    context.symbol_table()["strcmp"] = new declarations("strcmp", TheModule->getFunction("strcmp"), 0, 2, {1, 1});
+    context.symbol_table()["strcpy"] = new declarations("strcpy", TheModule->getFunction("strcpy"), 0, 2, {1, 1});
+    context.symbol_table()["strcat"] = new declarations("strcat", TheModule->getFunction("strcat"), 0, 2, {1, 1});
   }
 
   if (context.id > 1)
   {
     context.inherited() = prev->getInherited();
     context.symbol_table() = prev->getSymbolTable();
-    context.symbol_table()[Proto->getName()] = std::tuple<std::string, Value *, int, int>(TheFunction->getName(), TheFunction, context.getScopeId() - 1, 2); //pushes itself on local definitions
+    //Function Declares herself, in order to be able to call herself recursively
+    context.symbol_table()[Proto->getName()] = new declarations(TheFunction->getName(), TheFunction, context.getScopeId() - 1, 2, Proto->ArgsIsArrays());
   }
 
   int counter = 0;
@@ -1098,16 +1109,18 @@ Function *FunctionAST::codegen()
     if (counter < Proto->getArgsSize())
     {
       if (PointerType::classof((Proto->getArgs()[counter]).second) && PointerType::classof(((Proto->getArgs()[counter]).second)->getPointerElementType()))
-        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 1);
+        context.symbol_table()[Arg.getName()] = new declarations(Arg.getName(), Alloca, context.getScopeId(), 1, std::vector<int>());
       else
-        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId(), 0);
+        context.symbol_table()[Arg.getName()] = new declarations(Arg.getName(), Alloca, context.getScopeId(), 0, std::vector<int>());
     }
     else
     { //Hidden arguments
-      if (PointerType::classof(Arg.getType()) && ArrayType::classof(Arg.getType()->getPointerElementType()))
-        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 1);
-      else
-        context.symbol_table()[Arg.getName()] = std::tuple<std::string, Value *, int, int>(Arg.getName(), Alloca, context.getScopeId() - 1, 0);
+      int hiddenArgIsArray = 0;
+      if ((context.getPrev(context.getTop()))->getSymbolTable()[Arg.getName()])
+      {
+        hiddenArgIsArray = ((context.getPrev(context.getTop()))->getSymbolTable()[Arg.getName()])->isarray;
+      }
+      context.symbol_table()[Arg.getName()] = new declarations(Arg.getName(), Alloca, context.getScopeId() - 1, hiddenArgIsArray, std::vector<int>());
     }
     counter++;
   }
@@ -1137,11 +1150,13 @@ Function *FunctionAST::codegen()
     myfile << "\t";
   myfile << "symbol_table: " << context.symbol_table().size() << std::endl;
 
-  for (std::map<std::string, std::tuple<std::string, Value *, int, int>>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
+  for (std::map<std::string, declarations *>::iterator it = (context.symbol_table()).begin(); it != (context.symbol_table()).end(); ++it)
   {
     for (int i = 0; i < context.id; i++)
       myfile << "\t";
-    myfile << (it->first) << "   " << std::get<1>(it->second) << " scope:" << std::to_string(std::get<2>(it->second)) << "   " << std::to_string(std::get<3>(it->second)) << std::endl;
+
+    if ((it->second))
+      myfile << (it->first) << "   " << (*(it->second)).ptr << " scope:" << std::to_string((*(it->second)).definition_scope) << "   " << std::to_string((*(it->second)).isarray) << std::endl;
   }
   myfile << "\n";
 
@@ -1164,6 +1179,6 @@ Function *FunctionAST::codegen()
 
   // Error reading body, remove function.
   TheFunction->eraseFromParent();
-
+  
   return nullptr;
 }

@@ -265,7 +265,6 @@ int strEndWith(char* str, const char* suffix)
 }
 
 int create_imm(){
-
   // Save fd of stdout
   fpos_t pos;
   fgetpos(stdout, &pos);
@@ -273,38 +272,48 @@ int create_imm(){
 
   std::string imm_file = "temp.imm";
   FILE *fp = freopen(imm_file.c_str(),"w+",stdout);
+  if (!fp) {
+    std::cout << "Cannot create " <<  imm_file.c_str() << " file!" << std::endl;
+  }
   yyin = stdin;
-  // do{
-  //   yyparse();
-  // }while (!feof(yyin));
-
   if ( yyparse() )  return 1;
-  
   llvm_compile_and_dump(t);
-
   //Flush stdout so any buffered messages are delivered
   fflush(stdout);
   //Close file and restore standard output to stdout - which should be the terminal
   dup2(fd, fileno(stdout));
   close(fd);
-
   clearerr(stdout);
   fsetpos(stdout, &pos);
   return 0;
 }
 
-int create_asm() {
-  system("llc -filetype=asm --x86-asm-syntax=intel temp.imm -o temp.asm");
-  return 0;
+void create_asm() {
+  std::string command("llc -filetype=asm --x86-asm-syntax=intel temp.imm -o temp.asm");
+  int ret = system(command.c_str());
+  if (ret) {
+    std::cout << "[ERROR]: " + command << std::endl;
+  }
 }
 
-int compile(std::string filename) {
+void compile(std::string filename) {
   create_imm();
   create_asm();
-  system("llc -filetype=obj temp.imm -o temp.o");
-  std::string command("clang temp.o lib.a -o " + filename);
-  system(command.c_str());
-  system("rm temp.o");
+  std::string command("llc -filetype=obj temp.imm -o temp.o");
+  int ret = system(command.c_str());
+  if (ret) {
+    std::cout << "[ERROR]: " + command << std::endl;
+  }
+  command = "clang temp.o lib.a -o " + filename;
+  ret = system(command.c_str());
+  if (ret) {
+    std::cout << "[ERROR]: " + command << std::endl;
+  }
+  command = "rm temp.o";
+  ret = system(command.c_str());
+  if (ret) {
+    std::cout << "[ERROR]: " + command << std::endl;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -354,8 +363,7 @@ int main(int argc, char **argv) {
     int j=1;
     while(j<argc){
       if(strEndWith(argv[j], ".alan")) {
-        // printf("compiling %s\n", argv[j]);
-
+        printf("compiling %s\n", argv[j]);
         std::string text(argv[j]);
         std::string filename(text.substr(0, text.find(".alan")));
 
@@ -368,9 +376,15 @@ int main(int argc, char **argv) {
         std::string imm_file = filename+".imm";
         std::string asm_file = filename+".asm";
         std::string command("cp temp.imm " + imm_file);
-        system(command.c_str());
+        int ret = system(command.c_str());
+        if (ret) {
+          std::cout << "[ERROR]: " + command << std::endl;
+        }
         command = ("cp temp.asm " + asm_file);
-        system(command.c_str());
+        ret = system(command.c_str());
+        if (ret) {
+          std::cout << "[ERROR]: " + command << std::endl;
+        }
         break;
       }
       j++;
@@ -378,11 +392,25 @@ int main(int argc, char **argv) {
   }
   if (i_flag || f_flag)
     compile("a.out");
+  int ret;
+  std::string command;
   if (i_flag) {
-    system("cat temp.imm");
+    command = "cat temp.imm";
+    ret = system(command.c_str());
+    if (ret) {
+      std::cout << "[ERROR]: " + command << std::endl;
+    }
   }
   if(f_flag) {
-    system("cat temp.asm");
+    command = "cat temp.asm";
+    ret = system(command.c_str());
+    if (ret) {
+      std::cout << "[ERROR]: " + command << std::endl;
+    }
   }
-  system("rm -f temp.imm temp.asm");
+  command = "rm -f temp.imm temp.asm";
+  ret = system(command.c_str());
+  if (ret) {
+    std::cout << "[ERROR]: " + command << std::endl;
+  }
 }

@@ -35,7 +35,7 @@ alan: lexer.o parser.o ast.o general.o error.o
 	$(CXX) $(CXXFLAGS) -o alan $^ $(LDFLAGS) -lfl
 
 clean:
-	$(RM) lexer.cpp parser.cpp parser.hpp parser.output a.* *.o *~ alan *.dot
+	$(RM) lexer.cpp parser.cpp parser.hpp parser.output *.o *.imm *.asm *~ alan *.dot
 
 distclean: clean
 	$(RM) alan ast.txt debug

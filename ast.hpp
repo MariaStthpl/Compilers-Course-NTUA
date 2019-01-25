@@ -24,16 +24,23 @@ using namespace llvm;
 
 extern int o_flag, f_flag, i_flag;
 
+typedef struct declarations
+{
+  std::string new_name;                 // new name (if already taken)
+  Value *ptr;                           // pointer to AllocaInst or Function
+  int definition_scope;                 // scope of definition
+  int isarray;                          // 0: variable, 1: array, 2: function
+  std::vector<int> function_parameters; // 0: variable, 1: array
+  declarations(std::string nn, Value *v, int ds, int ia, std::vector<int> fp) : new_name(nn), ptr(v), definition_scope(ds), isarray(ia), function_parameters(fp) {}
+} declarations;
+
 class Scope
 {
 
 private:
   int id;
-  // std::map<std::string, std::tuple<std::string, Value *, int>> symbol_table;
   // symbol table
-  // variable/function name -> { new variable/function name, Pointer, definition's scope, array of variable }
-  // 0-variable, 1-array, 2-function
-  std::map<std::string, std::tuple<std::string, Value *, int, int>> symbol_table;
+  std::map<std::string, declarations *> symbol_table;
   std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> inherited;
 
 public:
@@ -42,7 +49,7 @@ public:
   BasicBlock *block;
   Value *returnValue = nullptr;
 
-  std::map<std::string, std::tuple<std::string, Value *, int, int>> &getSymbolTable() { return symbol_table; }
+  std::map<std::string, declarations *> &getSymbolTable() { return symbol_table; }
   std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> &getInherited() { return inherited; }
 
   void setId(int n) { id = n; }
@@ -58,7 +65,7 @@ class Scopes
 public:
   int id = 0;
   Scopes() {}
-  std::map<std::string, std::tuple<std::string, Value *, int, int>> &symbol_table() { return functions.top()->getSymbolTable(); }
+  std::map<std::string, declarations *> &symbol_table() { return functions.top()->getSymbolTable(); }
   std::map<std::string, std::map<std::string, std::pair<Type *, AllocaInst *>>> &inherited() { return functions.top()->getInherited(); }
   BasicBlock *currentBlock() { return functions.top()->block; }
   int getScopeId() { return functions.top()->getId(); }
@@ -347,18 +354,33 @@ public:
 // This class captures: name, argument names and return type of a function.
 class PrototypeAST
 {
-  int argsize;
+  size_t argsize;
   Type *t;
   std::string Name;
   std::vector<std::pair<std::string, Type *>> Args;
+  std::vector<Type *> argTypes;
 
 public:
   PrototypeAST(Type *t, const std::string &name, std::vector<std::pair<std::string, Type *>> Args) : t(t), Name(name), Args(std::move(Args)) {}
-  int getArgsSize() { return argsize; }
+
   Function *codegen();
+  int getArgsSize() { return argsize; }
   const std::string &getName() const { return Name; }
   Type *getType() { return t; }
   std::vector<std::pair<std::string, Type *>> getArgs() { return Args; }
+  std::vector<int> ArgsIsArrays()
+  {
+    std::vector<int> argTypes;
+    for (size_t k = 0; k < argsize; k++)
+    {
+      if (PointerType::classof((Args[k]).second) && PointerType::classof(((Args[k]).second)->getPointerElementType()))
+        argTypes.push_back(1);
+      else
+        argTypes.push_back(0);
+    }
+    return argTypes;
+  }
+
   std::vector<Type *> getArgsTypes()
   {
     std::vector<Type *> argTypes;
@@ -367,9 +389,13 @@ public:
     {
       // pass array by reference -> dont create pointer to pointer
       if (PointerType::classof((*it).second) && PointerType::classof(((*it).second)->getPointerElementType()))
+      {
         argTypes.push_back(((*it).second)->getPointerElementType());
+      }
       else
+      {
         argTypes.push_back((*it).second);
+      }
     }
     return argTypes;
   };
