@@ -26,16 +26,16 @@ parser.o: parser.cpp parser.hpp ast.hpp
 
 lexer.o: lexer.cpp parser.hpp ast.hpp
 
-ast.o: ast.cpp ast.hpp symbol.h general.h error.h
+ast.o: ast.cpp ast.hpp
 
 # %.o: %.cpp
 # 	$(CXX) $(CXXFLAGS) -c $<
 
-alan: lexer.o parser.o ast.o general.o error.o
+alan: lexer.o parser.o ast.o
 	$(CXX) $(CXXFLAGS) -o alan $^ $(LDFLAGS) -lfl
 
 clean:
-	$(RM) lexer.cpp parser.cpp parser.hpp parser.output *.o *.imm *.asm *~ alan *.dot
+	$(RM) lexer.cpp parser.cpp parser.hpp parser.output *.o *.imm *.asm *~ alan *.dot a.out
 
 distclean: clean
 	$(RM) alan ast.txt debug
