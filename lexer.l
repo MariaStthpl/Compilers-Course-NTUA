@@ -111,6 +111,7 @@ int hex2bin( const char *s )
 }
 
 %}
+%option noyywrap nounput batch
 
 L [a-zA-Z]
 D [0-9]
